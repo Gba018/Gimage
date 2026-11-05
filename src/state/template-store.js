@@ -10,6 +10,13 @@ import {
   normalizarFill,
   sincronizarCambioCajaTexto,
 } from '../template/schema.js';
+import {
+  extraerCamposPlantilla,
+  normalizarNombreCampo,
+  renombrarCampoEnCapas,
+  reemplazarCampoEnCapas,
+  resolverTexto,
+} from '../template/fields.js';
 
 // DECISION: conservar hasta 100 pasos de historial para equilibrar undo/redo profundo y consumo de memoria.
 const MAX_HISTORIAL = 100;
@@ -27,12 +34,18 @@ export function obtenerCajaTexto(capa) {
   return normalizarCajaTexto(capa.texto?.caja, capa.texto);
 }
 
-function normalizarCapaTextoConCaja(capa, cambioCaja = null) {
+function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) {
   if (!capa || capa.tipo !== 'texto' || !capa.texto) return capa;
   const cajaBase = obtenerCajaTexto(capa);
   const caja = cambioCaja ? sincronizarCambioCajaTexto(cajaBase, cambioCaja) : cajaBase;
+  // El auto-fit debe medir el texto ya resuelto, sin mutar el token original.
+  const textoParaMedir = resolverTexto(capa.texto.texto, fields);
   const fontSizeCalculado = caja.autoFit
-    ? calcularFontSizeAutoFit(capa.texto, caja.width, caja.height)
+    ? calcularFontSizeAutoFit(
+        { ...capa.texto, texto: textoParaMedir },
+        caja.width,
+        caja.height,
+      )
     : capa.texto.fontSize;
 
   return {
@@ -49,6 +62,7 @@ function crearSnapshot(state) {
   return {
     template: clonar(state.template),
     selectedIds: [...state.selectedIds],
+    fields: clonar(state.fields),
   };
 }
 
@@ -57,7 +71,7 @@ function filtrarSeleccionValida(capas, selectedIds) {
   return selectedIds.filter((id) => idsExistentes.has(id));
 }
 
-// La plantilla cumple 02-esquema-plantilla.md v3 (con capa.texto.caja como fuente de verdad); selección, guías e historial viven fuera del JSON.
+// La plantilla cumple 02-esquema-plantilla.md v3 (con capa.texto.caja como fuente de verdad); selección, guías, campos por defecto e historial viven fuera del JSON.
 export const useTemplateStore = create((set, get) => {
   function aplicarCambio(mutador, opciones = {}) {
     set((state) => {
@@ -66,14 +80,16 @@ export const useTemplateStore = create((set, get) => {
 
       const nextTemplateRaw = resultado.template ?? state.template;
       const nextTemplate = actualizarVersionPlantilla(nextTemplateRaw);
+      const nextFields = resultado.fields ?? state.fields;
       const nextSelectedIds = filtrarSeleccionValida(
         nextTemplate.capas,
         resultado.selectedIds ?? state.selectedIds,
       );
 
       const sinCambiosTemplate = JSON.stringify(nextTemplate) === JSON.stringify(state.template);
+      const sinCambiosFields = JSON.stringify(nextFields) === JSON.stringify(state.fields);
       const sinCambiosSeleccion = JSON.stringify(nextSelectedIds) === JSON.stringify(state.selectedIds);
-      if (sinCambiosTemplate && sinCambiosSeleccion) return {};
+      if (sinCambiosTemplate && sinCambiosFields && sinCambiosSeleccion) return {};
 
       const ahora = Date.now();
       const historyKey = opciones.historyKey || null;
@@ -91,6 +107,7 @@ export const useTemplateStore = create((set, get) => {
 
       return {
         template: nextTemplate,
+        fields: nextFields,
         selectedIds: nextSelectedIds,
         past: nextPast,
         future: [],
@@ -104,6 +121,7 @@ export const useTemplateStore = create((set, get) => {
   return {
     // DECISION: abrir de inmediato un proyecto vacío de 1080 × 1080 en memoria.
     template: crearPlantillaVacia(),
+    fields: {},
     selectedIds: [],
     guides: [],
     projectRevision: 0,
@@ -132,6 +150,7 @@ export const useTemplateStore = create((set, get) => {
       const tpl = clonar(anterior.template);
       return {
         template: tpl,
+        fields: clonar(anterior.fields),
         selectedIds: filtrarSeleccionValida(tpl.capas, anterior.selectedIds),
         past: state.past.slice(0, -1),
         future: [...state.future, crearSnapshot(state)],
@@ -147,6 +166,7 @@ export const useTemplateStore = create((set, get) => {
       const tpl = clonar(siguiente.template);
       return {
         template: tpl,
+        fields: clonar(siguiente.fields),
         selectedIds: filtrarSeleccionValida(tpl.capas, siguiente.selectedIds),
         past: [...state.past.slice(-(MAX_HISTORIAL - 1)), crearSnapshot(state)],
         future: state.future.slice(0, -1),
@@ -158,6 +178,7 @@ export const useTemplateStore = create((set, get) => {
 
     newProject: ({ name, nombre, width, height, background }) => set((state) => ({
       template: crearPlantillaVacia((nombre ?? name ?? '').trim() || 'Proyecto sin título', width, height, background),
+      fields: {},
       selectedIds: [],
       guides: [],
       past: [],
@@ -170,6 +191,7 @@ export const useTemplateStore = create((set, get) => {
 
     loadTemplate: (plantillaEntrada) => set((state) => ({
       template: hidratarPlantilla(clonar(plantillaEntrada)),
+      fields: {},
       selectedIds: [],
       guides: [],
       past: [],
@@ -250,7 +272,11 @@ export const useTemplateStore = create((set, get) => {
             actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambios[capa.tipo] };
           }
           if (actualizada.tipo === 'texto') {
-            actualizada = normalizarCapaTextoConCaja(actualizada, cambios.texto?.caja || null);
+            actualizada = normalizarCapaTextoConCaja(
+              actualizada,
+              cambios.texto?.caja || null,
+              state.fields,
+            );
           }
           return actualizada;
         });
@@ -271,7 +297,7 @@ export const useTemplateStore = create((set, get) => {
         const existe = state.template.capas.some((capa) => capa.id === id && capa.tipo === 'texto');
         if (!existe) return null;
         const capas = state.template.capas.map((capa) => (
-          capa.id === id ? normalizarCapaTextoConCaja(capa, parcial) : capa
+          capa.id === id ? normalizarCapaTextoConCaja(capa, parcial, state.fields) : capa
         ));
         return { template: { ...state.template, capas } };
       },
@@ -288,7 +314,7 @@ export const useTemplateStore = create((set, get) => {
           if (String(capa.texto?.fontFamily ?? '').trim().toLowerCase() !== objetivoFamilia) return capa;
           const caja = obtenerCajaTexto(capa);
           if (!caja?.autoFit) return capa;
-          const ajustada = normalizarCapaTextoConCaja(capa);
+          const ajustada = normalizarCapaTextoConCaja(capa, null, state.fields);
           if (ajustada.texto.fontSize !== capa.texto.fontSize) huboAjuste = true;
           return ajustada.texto.fontSize !== capa.texto.fontSize ? ajustada : capa;
         });
@@ -308,7 +334,11 @@ export const useTemplateStore = create((set, get) => {
             actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambioCapa[capa.tipo] };
           }
           if (actualizada.tipo === 'texto') {
-            actualizada = normalizarCapaTextoConCaja(actualizada, cambioCaja || cambioCapa.texto?.caja || null);
+            actualizada = normalizarCapaTextoConCaja(
+              actualizada,
+              cambioCaja || cambioCapa.texto?.caja || null,
+              state.fields,
+            );
           }
           return actualizada;
         });
@@ -433,7 +463,7 @@ export const useTemplateStore = create((set, get) => {
         copia.x = Math.round(capa.x + 24);
         copia.y = Math.round(capa.y + 24);
         if (copia.tipo === 'texto') {
-          return normalizarCapaTextoConCaja(copia);
+          return normalizarCapaTextoConCaja(copia, null, state.fields);
         }
         return copia;
       });
@@ -442,6 +472,68 @@ export const useTemplateStore = create((set, get) => {
         selectedIds: copias.map((copia) => copia.id),
       };
     }),
+
+    setFieldDefault: (nombre, valor) => aplicarCambio(
+      (state) => {
+        const limpio = normalizarNombreCampo(nombre);
+        if (!limpio) return null;
+        const existe = extraerCamposPlantilla(state.template).some((campo) => campo.nombre === limpio);
+        if (!existe) return null;
+        return {
+          fields: {
+            ...state.fields,
+            [limpio]: {
+              ...(state.fields[limpio] || {}),
+              defaultValue: valor ?? '',
+            },
+          },
+        };
+      },
+      { historyKey: `field:${normalizarNombreCampo(nombre)}:default` },
+    ),
+
+    renameField: (nombreAnterior, nombreNuevo) => aplicarCambio(
+      (state) => {
+        const anterior = normalizarNombreCampo(nombreAnterior);
+        const siguiente = normalizarNombreCampo(nombreNuevo);
+        if (!anterior || !siguiente || anterior === siguiente) return null;
+        const existe = extraerCamposPlantilla(state.template).some((campo) => campo.nombre === anterior);
+        if (!existe) return null;
+
+        const capas = renombrarCampoEnCapas(state.template.capas, anterior, siguiente);
+        const fields = { ...state.fields };
+        if (fields[anterior]) {
+          fields[siguiente] = { ...fields[anterior] };
+          delete fields[anterior];
+        }
+        return {
+          template: { ...state.template, capas },
+          fields,
+        };
+      },
+    ),
+
+    removeField: (nombre) => aplicarCambio(
+      (state) => {
+        const limpio = normalizarNombreCampo(nombre);
+        if (!limpio) return null;
+        const existe = extraerCamposPlantilla(state.template).some((campo) => campo.nombre === limpio);
+        if (!existe) return null;
+
+        const defecto = state.fields[limpio]?.defaultValue ?? '';
+        const capas = reemplazarCampoEnCapas(state.template.capas, limpio, {
+          valorTexto: String(defecto ?? ''),
+          valorImagen: String(defecto ?? ''),
+        });
+        const fields = { ...state.fields };
+        delete fields[limpio];
+
+        return {
+          template: { ...state.template, capas },
+          fields,
+        };
+      },
+    ),
 
     addGuide: (orientation, position) => set((state) => ({
       guides: [...state.guides, { id: `guide_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, orientation, position }],
