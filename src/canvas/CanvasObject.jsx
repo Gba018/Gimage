@@ -4,6 +4,7 @@ import { cargarGoogleFont, estadoGoogleFont, suscribirFuentes } from './font-loa
 import { cargarImagen } from './image-loader.js';
 import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
 import { DEFAULT_TEXT_BOX, konvaFillProps, normalizarStroke } from '../template/schema.js';
+import { esCampoImagen, resolverImagenSrc, resolverTexto } from '../template/fields.js';
 
 function usarImagen(src) {
   const [image, setImage] = useState(null);
@@ -32,6 +33,8 @@ export default function CanvasObject({
 }) {
   const selectObject = useTemplateStore((state) => state.selectObject);
   const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
+  const fields = useTemplateStore((state) => state.fields);
+  const isSelected = useTemplateStore((state) => state.selectedIds.includes(object.id));
 
   const textBox = useMemo(
     () => (object.tipo === 'texto' ? obtenerCajaTexto(object) : null),
@@ -45,7 +48,17 @@ export default function CanvasObject({
     () => (object.tipo === 'texto' ? (object.texto?.fontFamily || 'Inter') : 'Inter'),
   );
 
-  const image = usarImagen(object.tipo === 'imagen' ? object.imagen.src : '');
+  const imagenDinamica = object.tipo === 'imagen' && esCampoImagen(object.imagen?.src);
+  const imagenSrcResuelta = object.tipo === 'imagen'
+    ? resolverImagenSrc(object.imagen?.src, fields)
+    : '';
+  const textoResuelto = object.tipo === 'texto'
+    ? resolverTexto(object.texto?.texto, fields)
+    : '';
+  const textoConCampos = object.tipo === 'texto'
+    && /\{\{\s*([a-z0-9_-]+)\s*\}\}/.test(object.texto?.texto ?? '');
+
+  const image = usarImagen(imagenSrcResuelta);
 
   useEffect(() => {
     if (object.tipo !== 'texto' || !object.texto?.fontFamily) return undefined;
@@ -253,6 +266,10 @@ export default function CanvasObject({
           width={box.width}
           height={box.height}
           fill="rgba(0,0,0,0)"
+          stroke={textoConCampos && isSelected ? '#7c5cff' : undefined}
+          strokeWidth={textoConCampos && isSelected ? 2 : 0}
+          dash={textoConCampos && isSelected ? [6, 4] : undefined}
+          listening={false}
         />
         <Text
           ref={textNodeRef}
@@ -262,7 +279,7 @@ export default function CanvasObject({
           width={box.width}
           wrap="word"
           visible={!isEditing}
-          text={object.texto.texto}
+          text={textoResuelto}
           fontFamily={`${renderedFontFamily || object.texto.fontFamily}, system-ui, sans-serif`}
           fontSize={object.texto.fontSize}
           fontStyle={object.texto.fontStyle}
@@ -276,12 +293,29 @@ export default function CanvasObject({
   }
 
   if (object.tipo === 'imagen') {
+    if (imagenDinamica && !image) {
+      return (
+        <Rect
+          {...common}
+          width={object.imagen.width}
+          height={object.imagen.height}
+          fill="#eef1f4"
+          stroke="#9ca3af"
+          strokeWidth={2}
+          dash={[6, 4]}
+        />
+      );
+    }
+
     return (
       <KonvaImage
         {...common}
         width={object.imagen.width}
         height={object.imagen.height}
         image={image}
+        stroke={imagenDinamica && isSelected ? '#7c5cff' : undefined}
+        strokeWidth={imagenDinamica && isSelected ? 2 : 0}
+        dash={imagenDinamica && isSelected ? [6, 4] : undefined}
       />
     );
   }
