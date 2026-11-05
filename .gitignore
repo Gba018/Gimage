@@ -1,0 +1,12 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+.DS_Store
+.cache/
+.npm/
+.arena/
+uploads/
+*.zip
+.env
+.env.*
