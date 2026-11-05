@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { esFillDegradado, fillACss } from '../template/schema.js';
+import {
+  extraerCamposPlantilla,
+} from '../template/fields.js';
 
 function InsertCard({ icon, title, description, onClick, label }) {
   return (
@@ -29,6 +32,131 @@ function muestraCapaCss(capa) {
   return null;
 }
 
+function FieldRow({
+  campo,
+  valorDefecto,
+  onCambiarValor,
+  onRenombrar,
+  onEliminar,
+  onAplicarAImagen,
+  onInsertarEnTexto,
+  puedeAplicarAImagen,
+  puedeInsertarEnTexto,
+}) {
+  const [editando, setEditando] = useState(false);
+  const [nombreDraft, setNombreDraft] = useState(campo.nombre);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editando && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editando]);
+
+  function confirmarRenombrado() {
+    onRenombrar(nombreDraft);
+    setEditando(false);
+  }
+
+  return (
+    <li className="layer-row field-row" data-testid={`field-item-${campo.nombre}`}>
+      <span className="layer-type-badge" aria-hidden="true">
+        <Icon name={campo.tipo === 'imagen' ? 'image' : 'text'} size={13} />
+      </span>
+
+      <div className="layer-title-cell">
+        {editando ? (
+          <input
+            ref={inputRef}
+            type="text"
+            className="layer-rename-input"
+            aria-label="Nuevo nombre del campo"
+            value={nombreDraft}
+            onChange={(event) => setNombreDraft(event.target.value)}
+            onBlur={confirmarRenombrado}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmarRenombrado();
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                setEditando(false);
+                setNombreDraft(campo.nombre);
+              }
+            }}
+          />
+        ) : (
+          <span className="layer-name" title={`${campo.usos.length} uso(s)`}>
+            {`{{${campo.nombre}}}`}
+          </span>
+        )}
+        <small className="layer-pos-tag">
+          {campo.tipo === 'imagen' ? 'Imagen' : 'Texto'} · {campo.usos.length} uso(s)
+        </small>
+      </div>
+
+      <div className="field-controls">
+        <input
+          type="text"
+          className="layer-rename-input"
+          aria-label={`Valor por defecto para ${campo.nombre}`}
+          placeholder={campo.tipo === 'imagen' ? 'URL o dataURL' : 'Valor por defecto'}
+          value={valorDefecto}
+          onChange={(event) => onCambiarValor(event.target.value)}
+        />
+        <div className="field-actions">
+          <button
+            type="button"
+            className="layer-icon-btn"
+            aria-label={`Renombrar campo ${campo.nombre}`}
+            title="Renombrar campo"
+            onClick={() => {
+              setNombreDraft(campo.nombre);
+              setEditando(true);
+            }}
+          >
+            <Icon name="text" size={14} />
+          </button>
+          {campo.tipo === 'imagen' && (
+            <button
+              type="button"
+              className="layer-icon-btn"
+              aria-label={`Usar ${campo.nombre} en la imagen seleccionada`}
+              title="Usar en imagen seleccionada"
+              disabled={!puedeAplicarAImagen}
+              onClick={onAplicarAImagen}
+            >
+              <Icon name="image" size={14} />
+            </button>
+          )}
+          {campo.tipo === 'texto' && (
+            <button
+              type="button"
+              className="layer-icon-btn"
+              aria-label={`Insertar ${campo.nombre} en el texto seleccionado`}
+              title="Insertar en texto seleccionado"
+              disabled={!puedeInsertarEnTexto}
+              onClick={onInsertarEnTexto}
+            >
+              <Icon name="plus" size={14} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="layer-icon-btn is-danger"
+            aria-label={`Eliminar campo ${campo.nombre}`}
+            title="Eliminar campo"
+            onClick={onEliminar}
+          >
+            <Icon name="trash" size={14} />
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export default function LeftPanel({
   onInsertText,
   onInsertRect,
@@ -39,6 +167,7 @@ export default function LeftPanel({
 }) {
   const canvas = useTemplateStore((state) => state.template.canvas);
   const capas = useTemplateStore((state) => state.template.capas);
+  const fields = useTemplateStore((state) => state.fields);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
   const selectLayer = useTemplateStore((state) => state.selectLayer);
   const renameLayer = useTemplateStore((state) => state.renameLayer);
@@ -49,6 +178,10 @@ export default function LeftPanel({
   const moveSelectedBackward = useTemplateStore((state) => state.moveSelectedBackward);
   const duplicateSelected = useTemplateStore((state) => state.duplicateSelected);
   const deleteSelected = useTemplateStore((state) => state.deleteSelected);
+  const setFieldDefault = useTemplateStore((state) => state.setFieldDefault);
+  const renameField = useTemplateStore((state) => state.renameField);
+  const removeField = useTemplateStore((state) => state.removeField);
+  const updateObject = useTemplateStore((state) => state.updateObject);
 
   const [tab, setTab] = useState('objetos');
   const [editingId, setEditingId] = useState(null);
@@ -56,6 +189,17 @@ export default function LeftPanel({
   const [dragIndex, setDragIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
   const renameInputRef = useRef(null);
+
+  const camposDetectados = useMemo(
+    () => extraerCamposPlantilla({ capas }),
+    [capas],
+  );
+
+  const capaSeleccionada = useMemo(() => (
+    selectedIds.length === 1
+      ? capas.find((capa) => capa.id === selectedIds[0]) || null
+      : null
+  ), [capas, selectedIds]);
 
   useEffect(() => {
     if (editingId && renameInputRef.current) {
@@ -83,7 +227,7 @@ export default function LeftPanel({
   const puedeSubir = haySeleccion && capas.some((capa, idx) => idx < capas.length - 1 && selectedIds.includes(capa.id) && !selectedIds.includes(capas[idx + 1].id));
 
   return (
-    <aside className="sidebar" aria-label="Herramientas y capas">
+    <aside className="sidebar" aria-label="Herramientas, campos y capas">
       <div className="sidebar-tabs" role="tablist" aria-label="Secciones del panel izquierdo">
         <button
           type="button"
@@ -98,6 +242,17 @@ export default function LeftPanel({
         <button
           type="button"
           role="tab"
+          aria-selected={tab === 'campos'}
+          className={`sidebar-tab ${tab === 'campos' ? 'is-active' : ''}`}
+          onClick={() => setTab('campos')}
+        >
+          <Icon name="sparkle" size={14} />
+          <span>Campos</span>
+          <em className="layers-count">{camposDetectados.length}</em>
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === 'capas'}
           className={`sidebar-tab ${tab === 'capas' ? 'is-active' : ''}`}
           onClick={() => setTab('capas')}
@@ -108,7 +263,7 @@ export default function LeftPanel({
         </button>
       </div>
 
-      {tab === 'objetos' ? (
+      {tab === 'objetos' && (
         <>
           <div className="section-heading"><span>INSERTAR</span><span>01 — 05</span></div>
           <p className="section-description">Elige qué elemento agregar al lienzo.</p>
@@ -155,7 +310,76 @@ export default function LeftPanel({
             <div className="sidebar-footer"><span><i /> MODO DISEÑO</span><span>EN MEMORIA</span></div>
           </div>
         </>
-      ) : (
+      )}
+
+      {tab === 'campos' && (
+        <div className="fields-panel" data-testid="fields-panel">
+          <div className="section-heading"><span>CAMPOS DINÁMICOS</span><span>04</span></div>
+          <p className="section-description">
+            Escribe <code>{'{{nombre}}'}</code> en un texto o usa un campo en una imagen para crearlo.
+          </p>
+
+          {camposDetectados.length === 0 ? (
+            <div className="layers-empty">
+              <Icon name="sparkle" size={22} />
+              <strong>Sin campos todavía</strong>
+              <p>Añade tokens como <code>{'{{cliente}}'}</code> al contenido de un texto.</p>
+            </div>
+          ) : (
+            <ul className="layers-list" aria-label="Lista de campos dinámicos">
+              {camposDetectados.map((campo) => (
+                <FieldRow
+                  key={campo.nombre}
+                  campo={campo}
+                  valorDefecto={fields[campo.nombre]?.defaultValue ?? ''}
+                  onCambiarValor={(valor) => setFieldDefault(campo.nombre, valor)}
+                  onRenombrar={(nuevoNombre) => renameField(campo.nombre, nuevoNombre)}
+                  onEliminar={() => removeField(campo.nombre)}
+                  puedeAplicarAImagen={
+                    capaSeleccionada?.tipo === 'imagen'
+                    && !capaSeleccionada.bloqueada
+                  }
+                  puedeInsertarEnTexto={
+                    capaSeleccionada?.tipo === 'texto'
+                    && !capaSeleccionada.bloqueada
+                  }
+                  onAplicarAImagen={() => {
+                    if (!capaSeleccionada || capaSeleccionada.tipo !== 'imagen') return;
+                    updateObject(capaSeleccionada.id, {
+                      imagen: {
+                        ...capaSeleccionada.imagen,
+                        src: `{{${campo.nombre}}}`,
+                      },
+                    }, { historyKey: `field:${campo.nombre}:aplicar-imagen` });
+                  }}
+                  onInsertarEnTexto={() => {
+                    if (!capaSeleccionada || capaSeleccionada.tipo !== 'texto') return;
+                    const actual = capaSeleccionada.texto.texto || '';
+                    updateObject(capaSeleccionada.id, {
+                      texto: {
+                        ...capaSeleccionada.texto,
+                        texto: actual ? `${actual} {{${campo.nombre}}}` : `{{${campo.nombre}}}`,
+                      },
+                    }, { historyKey: `field:${campo.nombre}:insertar-texto` });
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+
+          <div className="sidebar-bottom">
+            <div className="shortcut-card">
+              <span className="shortcut-icon"><Icon name="sparkle" size={17} /></span>
+              <div>
+                <strong>Campos</strong>
+                <p>El valor por defecto se usa solo como vista previa; el token permanece en la plantilla.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'capas' && (
         // DECISION: no se añade agrupación persistente porque 02-esquema-plantilla.md v2 no define tipo grupo ni groupId; Shift+clic permite operar varias capas juntas.
         <div className="layers-panel" data-testid="layers-panel">
           <div className="layers-toolbar" role="toolbar" aria-label="Acciones de capas">
