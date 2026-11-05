@@ -1,5 +1,16 @@
+import Konva from 'konva';
+
 const HEX_CORTO = /^#?([0-9a-f]{3})$/i;
 const HEX_LARGO = /^#?([0-9a-f]{6})$/i;
+
+export const MIN_AUTO_FIT_FONT_SIZE = 8;
+export const MODOS_OVERFLOW_TEXTO = ['ajustar', 'recortar', 'libre'];
+export const DEFAULT_TEXT_BOX = {
+  width: 520,
+  height: 80,
+  overflow: 'libre',
+  autoFit: false,
+};
 
 export const clamp = (valor, min, max) => Math.min(max, Math.max(min, valor));
 
@@ -293,33 +304,94 @@ export function dimensionesInicialesImagen(naturalWidth, naturalHeight) {
 
 export function medirCajaTexto(textoSpec = {}) {
   const contenido = String(textoSpec.texto ?? '');
-  const fontSize = Math.max(8, Number(textoSpec.fontSize) || 48);
+  const fontSize = Math.max(MIN_AUTO_FIT_FONT_SIZE, Number(textoSpec.fontSize) || 48);
   const lineHeight = Number(textoSpec.lineHeight) || 1.2;
   const letterSpacing = Number(textoSpec.letterSpacing) || 0;
-  const lineas = (contenido || ' ').split('\n');
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext?.('2d');
-    if (ctx) {
-      const peso = textoSpec.fontStyle === 'bold' ? 'bold' : 'normal';
-      const familia = `${textoSpec.fontFamily || 'Inter'}, system-ui, sans-serif`;
-      ctx.font = `${peso} ${fontSize}px ${familia}`;
-      const anchos = lineas.map((linea) => {
-        const base = ctx.measureText(linea).width;
-        const extra = linea.length > 1 ? (linea.length - 1) * letterSpacing : 0;
-        return Math.max(1, base + extra);
-      });
-      return {
-        width: Math.max(1, Math.round(Math.max(...anchos, 1))),
-        height: Math.max(1, Math.round(fontSize * lineas.length * lineHeight)),
-      };
-    }
+  if (typeof document !== 'undefined' && Konva?.Text) {
+    const nodo = new Konva.Text({
+      text: contenido || ' ',
+      fontFamily: `${textoSpec.fontFamily || 'Inter'}, system-ui, sans-serif`,
+      fontSize,
+      fontStyle: textoSpec.fontStyle === 'bold' ? 'bold' : 'normal',
+      align: textoSpec.align || 'left',
+      letterSpacing,
+      lineHeight,
+      wrap: 'none',
+    });
+    const width = Math.max(1, Math.round(nodo.getTextWidth()));
+    const height = Math.max(1, Math.round(nodo.height()));
+    nodo.destroy();
+    return { width, height };
   }
+  const lineas = (contenido || ' ').split('\n');
   const maxChars = Math.max(1, ...lineas.map((l) => l.length));
   return {
     width: Math.max(1, Math.round(maxChars * fontSize * 0.55 + Math.max(0, maxChars - 1) * letterSpacing)),
     height: Math.max(1, Math.round(fontSize * lineas.length * lineHeight)),
   };
+}
+
+export function medirTextoEnCaja(textoSpec = {}, boxWidth = DEFAULT_TEXT_BOX.width) {
+  const anchoCaja = Math.max(8, Number(boxWidth) || DEFAULT_TEXT_BOX.width);
+  const contenido = String(textoSpec.texto ?? '');
+  const fontSize = Math.max(MIN_AUTO_FIT_FONT_SIZE, Number(textoSpec.fontSize) || 48);
+  const lineHeight = Number(textoSpec.lineHeight) || 1.2;
+  const letterSpacing = Number(textoSpec.letterSpacing) || 0;
+
+  if (typeof document !== 'undefined' && Konva?.Text) {
+    const nodo = new Konva.Text({
+      text: contenido,
+      fontFamily: `${textoSpec.fontFamily || 'Inter'}, system-ui, sans-serif`,
+      fontSize,
+      fontStyle: textoSpec.fontStyle === 'bold' ? 'bold' : 'normal',
+      align: textoSpec.align || 'left',
+      letterSpacing,
+      lineHeight,
+      width: anchoCaja,
+      wrap: 'word',
+    });
+    const height = nodo.height();
+    const maxLineWidth = nodo.getTextWidth();
+    const palabras = contenido.split(/\s+/).filter(Boolean);
+    const maxWordWidth = palabras.reduce((max, palabra) => {
+      const base = nodo.measureSize(palabra).width;
+      const extra = palabra.length > 0 ? palabra.length * letterSpacing : 0;
+      return Math.max(max, base + extra);
+    }, 0);
+    nodo.destroy();
+    return {
+      width: anchoCaja,
+      height,
+      maxLineWidth,
+      maxWordWidth,
+    };
+  }
+
+  const base = medirCajaTexto({ ...textoSpec, fontSize });
+  const lineasEstimadas = Math.max(1, Math.ceil(base.width / anchoCaja));
+  return {
+    width: anchoCaja,
+    height: lineasEstimadas * fontSize * lineHeight,
+    maxLineWidth: Math.min(anchoCaja, base.width),
+    maxWordWidth: base.width,
+  };
+}
+
+// DECISION: usar reducción decremental de 1 px desde el fontSize actual hasta un piso mínimo de 8 px usando Konva.Text temporal.
+export function calcularFontSizeAutoFit(textoSpec = {}, boxWidth = DEFAULT_TEXT_BOX.width, boxHeight = DEFAULT_TEXT_BOX.height) {
+  const ancho = Math.max(8, Number(boxWidth) || DEFAULT_TEXT_BOX.width);
+  const alto = Math.max(8, Number(boxHeight) || DEFAULT_TEXT_BOX.height);
+  const inicial = Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(textoSpec.fontSize) || 48));
+
+  if (!String(textoSpec.texto ?? '').trim()) return inicial;
+
+  for (let size = inicial; size > MIN_AUTO_FIT_FONT_SIZE; size -= 1) {
+    const medida = medirTextoEnCaja({ ...textoSpec, fontSize: size }, ancho);
+    if (medida.height <= alto + 0.5 && medida.maxLineWidth <= ancho + 0.5 && medida.maxWordWidth <= ancho + 0.5) {
+      return size;
+    }
+  }
+  return MIN_AUTO_FIT_FONT_SIZE;
 }
 
 export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
@@ -395,9 +467,8 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
       letterSpacing: 0,
       lineHeight: 1.2,
     };
-    const medida = medirCajaTexto(textoSpec);
-    capa.x = Math.round(cx - medida.width / 2);
-    capa.y = Math.round(cy - medida.height / 2);
+    capa.x = Math.round(cx - DEFAULT_TEXT_BOX.width / 2);
+    capa.y = Math.round(cy - DEFAULT_TEXT_BOX.height / 2);
     capa.texto = textoSpec;
   } else if (tipo === 'imagen') {
     const dims = dimensionesInicialesImagen(opciones.naturalWidth, opciones.naturalHeight);

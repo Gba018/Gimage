@@ -1,27 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  GOOGLE_FONTS_CATALOG,
+  cargarGoogleFont,
+  normalizarNombreFuente,
+  useFontLoaderState,
+} from '../canvas/font-loader.js';
 import FillEditor, { HexColorControl } from '../components/FillEditor.jsx';
 import { Icon } from '../components/Icons.jsx';
 import NumericInput from '../components/NumericInput.jsx';
-import { useTemplateStore } from '../state/template-store.js';
+import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
 import {
   clamp,
   extraerPlaceholdersTexto,
-  medirCajaTexto,
   normalizarStroke,
   redondear,
 } from '../template/schema.js';
-
-const FUENTES_BASE = [
-  'Inter',
-  'Roboto',
-  'Montserrat',
-  'Poppins',
-  'Playfair Display',
-  'Lora',
-  'Oswald',
-  'Georgia',
-  'Courier New',
-];
 
 const ETIQUETA_TIPO = {
   rect: 'Rectángulo',
@@ -47,9 +40,12 @@ export default function RightPanel({
 }) {
   const template = useTemplateStore((state) => state.template);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
+  const textBoxes = useTemplateStore((state) => state.textBoxes);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
   const setCanvasBackground = useTemplateStore((state) => state.setCanvasBackground);
   const updateObject = useTemplateStore((state) => state.updateObject);
+  const updateTextBox = useTemplateStore((state) => state.updateTextBox);
+  const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
   const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
   const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
   const duplicateSelected = useTemplateStore((state) => state.duplicateSelected);
@@ -64,6 +60,9 @@ export default function RightPanel({
 
   const [keepImageRatio, setKeepImageRatio] = useState(true);
   const imageRatioRef = useRef(1);
+  const [customFontDraft, setCustomFontDraft] = useState('');
+  const activeFontFamily = selectedLayer?.tipo === 'texto' ? selectedLayer.texto.fontFamily : '';
+  const { status: fontLoadStatus } = useFontLoaderState(activeFontFamily);
 
   useEffect(() => {
     if (selectedLayer?.tipo === 'imagen') {
@@ -73,12 +72,18 @@ export default function RightPanel({
     }
   }, [selectedLayer?.id, selectedLayer?.tipo]);
 
+  useEffect(() => {
+    if (selectedLayer?.tipo === 'texto') {
+      setCustomFontDraft(selectedLayer.texto.fontFamily || 'Inter');
+    }
+  }, [selectedLayer?.id, selectedLayer?.tipo, selectedLayer?.texto?.fontFamily]);
+
   const fuentesDisponibles = useMemo(() => {
     const usadas = template.capas
       .filter((capa) => capa.tipo === 'texto' && capa.texto?.fontFamily)
       .map((capa) => capa.texto.fontFamily.trim())
       .filter(Boolean);
-    return Array.from(new Set([...usadas, ...FUENTES_BASE]));
+    return Array.from(new Set([...GOOGLE_FONTS_CATALOG, ...usadas]));
   }, [template.capas]);
 
   if (!selectedLayer && selectedIds.length > 1) {
@@ -167,12 +172,23 @@ export default function RightPanel({
     updateObject(id, { [tipo]: { ...selectedLayer[tipo], ...parcial } }, { historyKey });
   }
 
-  const medidaTexto = tipo === 'texto' ? medirCajaTexto(selectedLayer.texto) : null;
+  const cajaTexto = tipo === 'texto' ? obtenerCajaTexto(selectedLayer, textBoxes) : null;
   const puntosLinea = tipo === 'linea' ? (selectedLayer.linea.points || [0, 0, 200, 0]) : null;
   const longitudLinea = puntosLinea
     ? Math.max(1, Math.round(Math.hypot(puntosLinea[2] - puntosLinea[0], puntosLinea[3] - puntosLinea[1])))
     : 0;
   const placeholders = tipo === 'texto' ? extraerPlaceholdersTexto(selectedLayer.texto.texto) : [];
+
+  function seleccionarFuenteGoogle(familiaRaw, historyKey) {
+    const familia = normalizarNombreFuente(familiaRaw) || 'Inter';
+    setCustomFontDraft(familia);
+    cargarGoogleFont(familia).then(() => {
+      reapplyAutoFitForFont(familia, { historyKey });
+    });
+    if (familia !== selectedLayer.texto.fontFamily) {
+      cambiarSubtipo({ fontFamily: familia }, historyKey);
+    }
+  }
 
   function cambiarLongitudLinea(nuevaLongitud) {
     const [x1, y1, x2, y2] = puntosLinea;
@@ -369,12 +385,12 @@ export default function RightPanel({
           </div>
         )}
 
-        {tipo === 'texto' && medidaTexto && (
+        {tipo === 'texto' && cajaTexto && (
           <div className="prop-grid-2 prop-mt">
             <div>
               <span className="prop-mini-label">Ancho (W)</span>
               <NumericInput
-                value={medidaTexto.width}
+                value={cajaTexto.width}
                 min={8}
                 max={10000}
                 step={4}
@@ -382,17 +398,13 @@ export default function RightPanel({
                 suffix="px"
                 ariaLabel="Ancho del texto"
                 disabled={bloqueada}
-                onChange={(nuevoAncho) => {
-                  const escala = nuevoAncho / Math.max(1, medidaTexto.width);
-                  const nuevoFontSize = clamp(Math.round(selectedLayer.texto.fontSize * escala), 8, 600);
-                  cambiarSubtipo({ fontSize: nuevoFontSize }, `layer:${id}:text-w`);
-                }}
+                onChange={(nuevoAncho) => updateTextBox(id, { width: nuevoAncho }, { historyKey: `layer:${id}:text-w` })}
               />
             </div>
             <div>
               <span className="prop-mini-label">Alto (H)</span>
               <NumericInput
-                value={medidaTexto.height}
+                value={cajaTexto.height}
                 min={8}
                 max={10000}
                 step={4}
@@ -400,11 +412,7 @@ export default function RightPanel({
                 suffix="px"
                 ariaLabel="Alto del texto"
                 disabled={bloqueada}
-                onChange={(nuevoAlto) => {
-                  const escala = nuevoAlto / Math.max(1, medidaTexto.height);
-                  const nuevoFontSize = clamp(Math.round(selectedLayer.texto.fontSize * escala), 8, 600);
-                  cambiarSubtipo({ fontSize: nuevoFontSize }, `layer:${id}:text-h`);
-                }}
+                onChange={(nuevoAlto) => updateTextBox(id, { height: nuevoAlto }, { historyKey: `layer:${id}:text-h` })}
               />
             </div>
           </div>
@@ -729,7 +737,20 @@ export default function RightPanel({
           </div>
 
           <div className="rp-section">
-            <span className="prop-sub-label">Tipografía</span>
+            <div className="rp-section-head">
+              <span className="prop-sub-label">Tipografía (Google Fonts)</span>
+              {fontLoadStatus === 'loading' && (
+                <span className="font-status-badge is-loading" data-testid="font-load-status" role="status">
+                  Cargando fuente…
+                </span>
+              )}
+              {fontLoadStatus === 'error' && (
+                <span className="font-status-badge is-error" data-testid="font-load-status" role="status">
+                  Usando alternativa
+                </span>
+              )}
+            </div>
+
             <select
               className="rp-select"
               aria-label="Seleccionar fuente usada"
@@ -737,7 +758,7 @@ export default function RightPanel({
               value={fuentesDisponibles.includes(selectedLayer.texto.fontFamily) ? selectedLayer.texto.fontFamily : '__custom__'}
               onChange={(event) => {
                 if (event.target.value !== '__custom__') {
-                  cambiarSubtipo({ fontFamily: event.target.value }, `layer:${id}:font`);
+                  seleccionarFuenteGoogle(event.target.value, `layer:${id}:font`);
                 }
               }}
             >
@@ -749,20 +770,42 @@ export default function RightPanel({
               )}
             </select>
 
-            <input
-              type="text"
-              className="rp-text-input prop-mt-sm"
-              aria-label="Nombre de fuente libre"
-              placeholder="Escribe otra familia (ej. Merriweather)"
-              disabled={bloqueada}
-              value={selectedLayer.texto.fontFamily}
-              onChange={(event) => cambiarSubtipo({ fontFamily: event.target.value }, `layer:${id}:font-free`)}
-              onBlur={() => {
-                if (!selectedLayer.texto.fontFamily.trim()) {
-                  cambiarSubtipo({ fontFamily: 'Inter' }, `layer:${id}:font-free`);
-                }
-              }}
-            />
+            <div className="font-custom-row prop-mt-sm">
+              <input
+                type="text"
+                className="rp-text-input"
+                aria-label="Nombre de fuente libre"
+                placeholder="Otra Google Font (ej. Pacifico)"
+                disabled={bloqueada}
+                value={customFontDraft}
+                onChange={(event) => setCustomFontDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    seleccionarFuenteGoogle(customFontDraft, `layer:${id}:font-free`);
+                  } else if (event.key === 'Escape') {
+                    setCustomFontDraft(selectedLayer.texto.fontFamily);
+                  }
+                }}
+                onBlur={() => {
+                  const limpia = normalizarNombreFuente(customFontDraft);
+                  if (!limpia) {
+                    setCustomFontDraft(selectedLayer.texto.fontFamily || 'Inter');
+                  } else if (limpia !== selectedLayer.texto.fontFamily) {
+                    seleccionarFuenteGoogle(limpia, `layer:${id}:font-free`);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="rp-btn font-load-btn"
+                aria-label="Cargar Google Font"
+                disabled={bloqueada || !normalizarNombreFuente(customFontDraft)}
+                onClick={() => seleccionarFuenteGoogle(customFontDraft, `layer:${id}:font-free`)}
+              >
+                Cargar
+              </button>
+            </div>
 
             <div className="prop-grid-2 prop-mt">
               <div>
@@ -860,6 +903,50 @@ export default function RightPanel({
               </div>
             </div>
           </div>
+
+          {cajaTexto && (
+            <div className="rp-section">
+              <div className="autofit-toggle-row">
+                <div>
+                  <span className="prop-sub-label prop-no-margin">Auto-fit en caja</span>
+                  <small className="prop-helper-note">Reduce el tamaño hasta caber en {cajaTexto.width} × {cajaTexto.height} px</small>
+                </div>
+                <button
+                  type="button"
+                  className={`autofit-switch ${cajaTexto.autoFit ? 'is-on' : ''}`}
+                  aria-label="Auto-fit de texto"
+                  aria-pressed={cajaTexto.autoFit}
+                  disabled={bloqueada}
+                  onClick={() => updateTextBox(id, { autoFit: !cajaTexto.autoFit })}
+                >
+                  <span className="autofit-switch-thumb" />
+                </button>
+              </div>
+
+              <div className="prop-mt">
+                <span className="prop-mini-label">Desbordamiento (Overflow)</span>
+                <div className="overflow-segmented" role="group" aria-label="Modo de overflow de texto">
+                  {[
+                    { key: 'ajustar', label: 'Ajustar' },
+                    { key: 'recortar', label: 'Recortar' },
+                    { key: 'libre', label: 'Libre' },
+                  ].map((modo) => (
+                    <button
+                      key={modo.key}
+                      type="button"
+                      className={`overflow-seg-btn ${cajaTexto.overflow === modo.key ? 'is-active' : ''}`}
+                      aria-label={`Overflow ${modo.key}`}
+                      aria-pressed={cajaTexto.overflow === modo.key}
+                      disabled={bloqueada}
+                      onClick={() => updateTextBox(id, { overflow: modo.key })}
+                    >
+                      {modo.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="rp-section">
             <FillEditor

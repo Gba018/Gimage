@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Circle, Image as KonvaImage, Line, Rect, Text } from 'react-konva';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from 'react-konva';
+import { cargarGoogleFont, estadoGoogleFont, suscribirFuentes } from './font-loader.js';
 import { cargarImagen } from './image-loader.js';
-import { useTemplateStore } from '../state/template-store.js';
-import { konvaFillProps, medirCajaTexto, normalizarStroke } from '../template/schema.js';
+import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
+import { konvaFillProps, normalizarStroke } from '../template/schema.js';
 
 function usarImagen(src) {
   const [image, setImage] = useState(null);
@@ -19,10 +20,81 @@ function usarImagen(src) {
   return image;
 }
 
-export default function CanvasObject({ object, registerNode, onDragStart, onDragMove, onDragEnd, panMode }) {
+export default function CanvasObject({
+  object,
+  registerNode,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onStartTextEdit,
+  isEditing = false,
+  panMode,
+}) {
   const selectObject = useTemplateStore((state) => state.selectObject);
-  const updateObject = useTemplateStore((state) => state.updateObject);
+  const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
+  const rawTextBox = useTemplateStore((state) => (
+    object.tipo === 'texto' ? state.textBoxes[object.id] : null
+  ));
+
+  const textBox = useMemo(
+    () => (object.tipo === 'texto'
+      ? obtenerCajaTexto(object, rawTextBox ? { [object.id]: rawTextBox } : {})
+      : null),
+    [object, rawTextBox],
+  );
+
+  const textBoxRef = useRef(textBox);
+  textBoxRef.current = textBox;
+  const textNodeRef = useRef(null);
+  const [renderedFontFamily, setRenderedFontFamily] = useState(
+    () => (object.tipo === 'texto' ? (object.texto?.fontFamily || 'Inter') : 'Inter'),
+  );
+
   const image = usarImagen(object.tipo === 'imagen' ? object.imagen.src : '');
+
+  useEffect(() => {
+    if (object.tipo !== 'texto' || !object.texto?.fontFamily) return undefined;
+    const familia = object.texto.fontFamily;
+    let activo = true;
+
+    const activarYRemedir = () => {
+      if (!activo) return;
+      setRenderedFontFamily(familia);
+      window.requestAnimationFrame(() => {
+        if (!activo) return;
+        const nodoTexto = textNodeRef.current;
+        if (nodoTexto) {
+          nodoTexto._setTextData?.();
+          nodoTexto.getLayer()?.batchDraw();
+        }
+        reapplyAutoFitForFont(familia, { historyKey: `font-autofit:${object.id}` });
+      });
+    };
+
+    if (estadoGoogleFont(familia) === 'loaded') {
+      activarYRemedir();
+      return () => { activo = false; };
+    }
+
+    cargarGoogleFont(familia).then(() => {
+      activarYRemedir();
+    });
+
+    const cancelarSuscripcion = suscribirFuentes((evento) => {
+      if (
+        (evento.status === 'loaded' || evento.status === 'error')
+        && evento.family.toLowerCase() === String(familia).trim().toLowerCase()
+      ) {
+        activarYRemedir();
+      }
+    });
+
+    return () => {
+      activo = false;
+      cancelarSuscripcion();
+    };
+  }, [object.id, object.tipo, object.texto?.fontFamily, reapplyAutoFitForFont]);
+
   const setNode = useCallback((node) => {
     if (node && object.tipo === 'linea') {
       // Garantiza una altura mínima de caja para que Konva.Transformer pueda escalar líneas horizontales a cualquier zoom.
@@ -43,14 +115,27 @@ export default function CanvasObject({ object, registerNode, onDragStart, onDrag
           height: Math.max(12, rawH),
         };
       };
+    } else if (node && object.tipo === 'texto') {
+      // Mantiene el bounding box del Group anclado a width × height de la caja de texto en los 3 modos de overflow.
+      node.getClientRect = function getClientRectTexto(config = {}) {
+        const caja = textBoxRef.current || { width: 520, height: 80 };
+        const sx = node.scaleX();
+        const sy = node.scaleY();
+        const selfRect = {
+          x: 0,
+          y: 0,
+          width: caja.width,
+          height: caja.height,
+        };
+        if (config.skipTransform) {
+          return selfRect;
+        }
+        // _transformedRect aplica posición, rotación y escala actual (incluyendo durante el arrastre de Transformer)
+        return this._transformedRect(selfRect, config.relativeTo);
+      };
     }
     registerNode(object.id, node);
   }, [object.id, object.tipo, registerNode]);
-
-  const medidaTexto = useMemo(
-    () => (object.tipo === 'texto' ? medirCajaTexto(object.texto) : null),
-    [object.tipo, object.texto],
-  );
 
   function select(event) {
     if (panMode || object.bloqueada || (event.evt.button !== undefined && event.evt.button !== 0)) return;
@@ -61,15 +146,13 @@ export default function CanvasObject({ object, registerNode, onDragStart, onDrag
   function editText(event) {
     if (object.tipo !== 'texto' || panMode || object.bloqueada) return;
     event.cancelBubble = true;
-    const nuevoTexto = window.prompt('Editar texto', object.texto.texto);
-    if (nuevoTexto !== null) {
-      updateObject(object.id, { texto: { ...object.texto, texto: nuevoTexto } });
-    }
+    selectObject(object.id, false);
+    onStartTextEdit?.(object.id);
   }
 
   const common = {
     ref: setNode,
-    id: object.id,
+    id: object.tipo === 'texto' ? `${object.id}__box` : object.id,
     name: 'canvas-object',
     x: object.x,
     y: object.y,
@@ -77,7 +160,7 @@ export default function CanvasObject({ object, registerNode, onDragStart, onDrag
     opacity: object.opacity,
     visible: object.visible,
     listening: !object.bloqueada,
-    draggable: !object.bloqueada && !panMode,
+    draggable: !object.bloqueada && !panMode && !isEditing,
     onMouseDown: select,
     onTouchStart: select,
     onDblClick: editText,
@@ -86,7 +169,9 @@ export default function CanvasObject({ object, registerNode, onDragStart, onDrag
     onDragMove: () => onDragMove(object.id),
     onDragEnd: () => onDragEnd(object.id),
     onMouseEnter: (event) => {
-      if (!panMode && !object.bloqueada) event.target.getStage().container().style.cursor = 'move';
+      if (!panMode && !object.bloqueada && !isEditing) {
+        event.target.getStage().container().style.cursor = 'move';
+      }
     },
     onMouseLeave: (event) => {
       event.target.getStage().container().style.cursor = '';
@@ -150,24 +235,50 @@ export default function CanvasObject({ object, registerNode, onDragStart, onDrag
   }
 
   if (object.tipo === 'texto') {
+    const box = textBox || { width: 520, height: 80, overflow: 'libre', autoFit: false };
+    const recortar = box.overflow === 'recortar';
     const fillProps = konvaFillProps(object.texto.fill, {
       minX: 0,
       minY: 0,
-      width: medidaTexto?.width || 1,
-      height: medidaTexto?.height || 1,
+      width: box.width,
+      height: box.height,
     });
+
     return (
-      <Text
+      <Group
         {...common}
-        text={object.texto.texto}
-        fontFamily={`${object.texto.fontFamily}, system-ui, sans-serif`}
-        fontSize={object.texto.fontSize}
-        fontStyle={object.texto.fontStyle}
-        align={object.texto.align}
-        letterSpacing={object.texto.letterSpacing}
-        lineHeight={object.texto.lineHeight}
-        {...fillProps}
-      />
+        width={box.width}
+        height={box.height}
+        clipX={recortar ? 0 : undefined}
+        clipY={recortar ? 0 : undefined}
+        clipWidth={recortar ? box.width : undefined}
+        clipHeight={recortar ? box.height : undefined}
+      >
+        <Rect
+          x={0}
+          y={0}
+          width={box.width}
+          height={box.height}
+          fill="rgba(0,0,0,0)"
+        />
+        <Text
+          ref={textNodeRef}
+          id={object.id}
+          x={0}
+          y={0}
+          width={box.width}
+          wrap="word"
+          visible={!isEditing}
+          text={object.texto.texto}
+          fontFamily={`${renderedFontFamily || object.texto.fontFamily}, system-ui, sans-serif`}
+          fontSize={object.texto.fontSize}
+          fontStyle={object.texto.fontStyle}
+          align={object.texto.align}
+          letterSpacing={object.texto.letterSpacing}
+          lineHeight={object.texto.lineHeight}
+          {...fillProps}
+        />
+      </Group>
     );
   }
 

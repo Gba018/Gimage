@@ -16,6 +16,7 @@ async function state(page) {
     return {
       template: store.template,
       selectedIds: store.selectedIds,
+      textBoxes: store.textBoxes,
       guides: store.guides,
       pastCount: store.past.length,
       futureCount: store.future.length,
@@ -704,3 +705,302 @@ test('el redimensionado múltiple conserva proporciones y no añade campos extra
     expect(capa).not.toHaveProperty('skewY');
   }
 });
+
+test('Fase 03: edición inline con doble clic en canvas, Enter, Escape, clic fuera, zoom/paneo y rotación', async ({ page }) => {
+  await page.getByRole('button', { name: 'Añadir texto' }).click();
+  let current = await state(page);
+  const textLayer = current.template.capas[0];
+  const box = current.textBoxes[textLayer.id];
+
+  // Aplicar zoom y rotación antes de editar inline para comprobar conversión a pantalla y rotación CSS
+  await page.getByRole('button', { name: 'Acercar' }).click();
+  await page.getByLabel('Rotación').fill('15');
+  await page.getByLabel('Rotación').blur();
+
+  current = await state(page);
+  const rotatedLayer = current.template.capas[0];
+  // Punto cercano a la esquina superior-izquierda rotada 15° sigue cayendo dentro del cuadro 520x80
+  const clickTarget = await point(page, rotatedLayer.x + 80, rotatedLayer.y + 45);
+  await page.mouse.dblclick(clickTarget.x, clickTarget.y);
+
+  const inlineEditor = page.getByTestId('inline-text-editor');
+  await expect(inlineEditor).toBeVisible();
+  await expect(inlineEditor).toBeFocused();
+
+  // Verificar estilo y rotación sincronizados y drag deshabilitado en el nodo Konva durante edición
+  const editorInfo = await page.evaluate((id) => {
+    const el = document.querySelector('[data-testid="inline-text-editor"]');
+    const stage = window.Konva.stages[0];
+    const groupNode = stage.findOne(`#${id}__box`);
+    return {
+      transform: el.style.transform,
+      textAlign: el.style.textAlign,
+      left: parseFloat(el.style.left),
+      top: parseFloat(el.style.top),
+      width: parseFloat(el.style.width),
+      fontSize: parseFloat(el.style.fontSize),
+      draggable: groupNode.draggable(),
+    };
+  }, rotatedLayer.id);
+
+  expect(editorInfo.transform).toBe('rotate(15deg)');
+  expect(editorInfo.textAlign).toBe('center');
+  expect(editorInfo.left).toBeCloseTo(current.view.x + rotatedLayer.x * current.view.scale, 1);
+  expect(editorInfo.top).toBeCloseTo(current.view.y + rotatedLayer.y * current.view.scale, 1);
+  expect(editorInfo.width).toBeCloseTo(box.width * current.view.scale, 1);
+  expect(editorInfo.fontSize).toBeCloseTo(rotatedLayer.texto.fontSize * current.view.scale, 1);
+  expect(editorInfo.draggable).toBe(false);
+
+  // El zoom con rueda sigue funcionando durante la edición inline sin cerrarla
+  const holder = await page.getByTestId('stage-holder').boundingBox();
+  await page.mouse.move(holder.x + 120, holder.y + 120);
+  await page.mouse.wheel(0, -100);
+  await expect(inlineEditor).toBeVisible();
+
+  // 1) Confirmar con Enter actualiza store y dispara undo
+  const pastBeforeEnter = (await state(page)).pastCount;
+  await inlineEditor.fill('Oferta confirmada con Enter');
+  await inlineEditor.press('Enter');
+  await expect(inlineEditor).toBeHidden();
+
+  current = await state(page);
+  expect(current.template.capas[0].texto.texto).toBe('Oferta confirmada con Enter');
+  expect(current.pastCount).toBe(pastBeforeEnter + 1);
+
+  // Quitar rotación para probar Escape y clic fuera cómodamente en el centro de la caja
+  await page.getByLabel('Rotación').fill('0');
+  await page.getByLabel('Rotación').blur();
+  current = await state(page);
+  const centerPoint = await point(
+    page,
+    current.template.capas[0].x + current.textBoxes[textLayer.id].width / 2,
+    current.template.capas[0].y + current.textBoxes[textLayer.id].height / 2,
+  );
+
+  // 2) Escape cancela y restaura el valor anterior sin registrar paso extra en undo
+  const pastBeforeEsc = current.pastCount;
+  await page.mouse.dblclick(centerPoint.x, centerPoint.y);
+  await expect(inlineEditor).toBeVisible();
+  await inlineEditor.fill('Texto temporal descartado');
+  await inlineEditor.press('Escape');
+  await expect(inlineEditor).toBeHidden();
+
+  current = await state(page);
+  expect(current.template.capas[0].texto.texto).toBe('Oferta confirmada con Enter');
+  expect(current.pastCount).toBe(pastBeforeEsc);
+
+  // 3) Click fuera confirma la edición y actualiza el store
+  await page.mouse.dblclick(centerPoint.x, centerPoint.y);
+  await expect(inlineEditor).toBeVisible();
+  await inlineEditor.fill('Confirmado con clic fuera');
+  const outsidePoint = await point(page, 40, 40);
+  await page.mouse.click(outsidePoint.x, outsidePoint.y);
+  await expect(inlineEditor).toBeHidden();
+
+  current = await state(page);
+  expect(current.template.capas[0].texto.texto).toBe('Confirmado con clic fuera');
+
+  // Undo revierte la edición inline
+  await page.keyboard.press('Control+z');
+  current = await state(page);
+  expect(current.template.capas[0].texto.texto).toBe('Oferta confirmada con Enter');
+});
+
+test('Fase 03: Google Fonts dinámicas del catálogo curado, familia adicional libre con WebFont.load e indicador de carga', async ({ page }) => {
+  // Retrasar levemente la petición de CSS de Pacifico para observar el estado breve de carga
+  await page.route('https://fonts.googleapis.com/**', async (route) => {
+    if (route.request().url().includes('Pacifico')) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await route.continue();
+  });
+
+  await page.getByRole('button', { name: 'Añadir texto' }).click();
+
+  // Verificar que el select incluye todo el catálogo base curado de Fase 03
+  const opcionesCatalogo = await page.getByLabel('Seleccionar fuente usada').locator('option').allTextContents();
+  expect(opcionesCatalogo).toEqual(expect.arrayContaining([
+    'Inter',
+    'Roboto',
+    'Open Sans',
+    'Lato',
+    'Montserrat',
+    'Poppins',
+    'Oswald',
+    'Playfair Display',
+    'Merriweather',
+    'Bebas Neue',
+  ]));
+
+  // Elegir una fuente del catálogo (Playfair Display) y comprobar render real en Konva
+  await page.getByLabel('Seleccionar fuente usada').selectOption('Playfair Display');
+  await expect.poll(async () => page.evaluate(() => {
+    const stage = window.Konva.stages[0];
+    const textNode = stage.find('Text')[0];
+    return textNode?.fontFamily() || '';
+  })).toContain('Playfair Display');
+
+  const playfairLoaded = await page.evaluate(() => document.fonts.check('24px "Playfair Display"'));
+  expect(playfairLoaded).toBe(true);
+
+  // Escribir una familia adicional de Google Fonts (Pacifico) en el input libre y confirmar
+  const freeInput = page.getByLabel('Nombre de fuente libre');
+  await freeInput.fill('Pacifico');
+  await freeInput.press('Enter');
+
+  // Debe aparecer brevemente el indicador de carga mientras descarga
+  await expect(page.getByTestId('font-load-status')).toContainText('Cargando fuente');
+  await expect(page.getByTestId('font-load-status')).toBeHidden({ timeout: 8000 });
+
+  await expect.poll(async () => page.evaluate(() => {
+    const stage = window.Konva.stages[0];
+    const textNode = stage.find('Text')[0];
+    return textNode?.fontFamily() || '';
+  })).toContain('Pacifico');
+
+  const pacificoLoaded = await page.evaluate(() => document.fonts.check('24px "Pacifico"'));
+  expect(pacificoLoaded).toBe(true);
+
+  const current = await state(page);
+  expect(current.template.capas[0].texto.fontFamily).toBe('Pacifico');
+  // Contrato JSON intacto
+  expect(Object.keys(current.template.capas[0].texto).sort()).toEqual([
+    'align', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
+  ]);
+});
+
+test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxeles de Konva, undo/redo y esquema v2', async ({ page }) => {
+  await page.getByRole('button', { name: 'Añadir texto' }).click();
+
+  // Posicionar en (100, 100) con caja 240 x 70 y tamaño inicial 48 px
+  await page.getByLabel('Posición X').fill('100');
+  await page.getByLabel('Posición X').blur();
+  await page.getByLabel('Posición Y').fill('100');
+  await page.getByLabel('Posición Y').blur();
+  await page.getByLabel('Ancho del texto').fill('240');
+  await page.getByLabel('Ancho del texto').blur();
+  await page.getByLabel('Alto del texto').fill('70');
+  await page.getByLabel('Alto del texto').blur();
+  await page.getByRole('button', { name: 'Alinear a la izquierda' }).click();
+
+  // Escribir texto largo que excede ampliamente 240 x 70 a 48 px
+  await page.getByLabel('Contenido del texto').fill(
+    'Gran liquidación de temporada con descuentos especiales en toda la tienda online',
+  );
+
+  let current = await state(page);
+  const textId = current.template.capas[0].id;
+  expect(current.template.capas[0].texto.fontSize).toBe(48);
+  expect(current.textBoxes[textId]).toEqual({
+    width: 240,
+    height: 70,
+    overflow: 'libre',
+    autoFit: false,
+  });
+
+  // Helper que cuenta píxeles oscuros del objeto dentro y debajo de la caja (100, 100, 240, 70) sin el marco del Transformer
+  async function contarPixelesTexto() {
+    return page.evaluate(() => {
+      const stage = window.Konva.stages[0];
+      const transformer = stage.findOne('Transformer');
+      const wasVisible = transformer ? transformer.visible() : false;
+      if (transformer) transformer.visible(false);
+      const oldPos = { x: stage.x(), y: stage.y(), sx: stage.scaleX(), sy: stage.scaleY() };
+      stage.position({ x: 0, y: 0 });
+      stage.scale({ x: 1, y: 1 });
+      const snap = stage.toCanvas({ x: 95, y: 95, width: 260, height: 260, pixelRatio: 1 });
+      stage.position({ x: oldPos.x, y: oldPos.y });
+      stage.scale({ x: oldPos.sx, y: oldPos.sy });
+      if (transformer) transformer.visible(wasVisible);
+      stage.batchDraw();
+
+      const ctx = snap.getContext('2d');
+      // Dentro de la caja: y de 102 a 165 -> en snap es y de 7 a 70
+      const insideData = ctx.getImageData(5, 7, 240, 60).data;
+      // Justo fuera del borde inferior (y = 171..331 en lienzo -> y = 76..236 en snap)
+      const outsideData = ctx.getImageData(5, 76, 240, 160).data;
+
+      let insideDark = 0;
+      let outsideDark = 0;
+      for (let i = 0; i < insideData.length; i += 4) {
+        if (insideData[i] < 180 && insideData[i + 1] < 180 && insideData[i + 2] < 180) insideDark += 1;
+      }
+      for (let i = 0; i < outsideData.length; i += 4) {
+        if (outsideData[i] < 180 && outsideData[i + 1] < 180 && outsideData[i + 2] < 180) outsideDark += 1;
+      }
+      return { insideDark, outsideDark };
+    });
+  }
+
+  // 1) En modo "libre" (por defecto), el texto se extiende más allá de los 70 px de alto de la caja
+  const pixelesLibre = await contarPixelesTexto();
+  expect(pixelesLibre.insideDark).toBeGreaterThan(50);
+  expect(pixelesLibre.outsideDark).toBeGreaterThan(50);
+
+  // 2) Cambiar Overflow a "recortar": NO debe dibujar ningún píxel de texto fuera del bounding box
+  await page.getByRole('button', { name: 'Overflow recortar' }).click();
+  current = await state(page);
+  expect(current.textBoxes[textId].overflow).toBe('recortar');
+  expect(current.textBoxes[textId].autoFit).toBe(false);
+  expect(current.template.capas[0].texto.fontSize).toBe(48);
+
+  const pixelesRecortar = await contarPixelesTexto();
+  expect(pixelesRecortar.insideDark).toBeGreaterThan(50);
+  expect(pixelesRecortar.outsideDark).toBe(0);
+
+  // 3) Activar Auto-fit (o modo "ajustar"): reduce progresivamente fontSize sin modificar width ni height
+  await page.getByRole('button', { name: 'Auto-fit de texto' }).click();
+  current = await state(page);
+  const reducedFontSize = current.template.capas[0].texto.fontSize;
+  expect(current.textBoxes[textId]).toEqual({
+    width: 240,
+    height: 70,
+    overflow: 'ajustar',
+    autoFit: true,
+  });
+  expect(reducedFontSize).toBeLessThan(48);
+  expect(reducedFontSize).toBeGreaterThanOrEqual(8);
+
+  // Ahora todo el texto cabe dentro de la caja (sin píxeles desbordando abajo)
+  const pixelesAjustar = await contarPixelesTexto();
+  expect(pixelesAjustar.insideDark).toBeGreaterThan(30);
+  expect(pixelesAjustar.outsideDark).toBe(0);
+
+  // 4) Undo y Redo restauran tanto fontSize como modo de overflow/autoFit sin ensuciar el esquema JSON v2
+  await page.keyboard.press('Control+z');
+  current = await state(page);
+  expect(current.textBoxes[textId].overflow).toBe('recortar');
+  expect(current.textBoxes[textId].autoFit).toBe(false);
+  expect(current.template.capas[0].texto.fontSize).toBe(48);
+
+  await page.keyboard.press('Control+y');
+  current = await state(page);
+  expect(current.textBoxes[textId].overflow).toBe('ajustar');
+  expect(current.textBoxes[textId].autoFit).toBe(true);
+  expect(current.template.capas[0].texto.fontSize).toBe(reducedFontSize);
+
+  // 5) Al cambiar a una fuente más ancha (Merriweather) o encoger la caja con Transformer, Auto-fit re-mide sin alterar width/height inesperadamente
+  await page.getByLabel('Seleccionar fuente usada').selectOption('Merriweather');
+  await expect.poll(async () => page.evaluate(() => document.fonts.check('16px "Merriweather"'))).toBe(true);
+  current = await state(page);
+  expect(current.textBoxes[textId].width).toBe(240);
+  expect(current.textBoxes[textId].height).toBe(70);
+  expect((await contarPixelesTexto()).outsideDark).toBe(0);
+
+  // Encoger el ancho de la caja desde el tirador middle-right del Transformer
+  const sizeBeforeDrag = current.template.capas[0].texto.fontSize;
+  await drag(page, await anchor(page, 'middle-right'), -60 * current.view.scale, 0);
+  current = await state(page);
+  expect(current.textBoxes[textId].width).toBeLessThan(200);
+  expect(current.template.capas[0].texto.fontSize).toBeLessThanOrEqual(sizeBeforeDrag);
+
+  // Validar contrato estricto 02-esquema-plantilla.md v2 (sin ningún campo extra en template ni en capa.texto)
+  expect(Object.keys(current.template).sort()).toEqual(['canvas', 'capas', 'nombre', 'version']);
+  expect(Object.keys(current.template.capas[0]).sort()).toEqual([
+    'bloqueada', 'id', 'nombre', 'opacity', 'rotation', 'texto', 'tipo', 'visible', 'x', 'y',
+  ]);
+  expect(Object.keys(current.template.capas[0].texto).sort()).toEqual([
+    'align', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
+  ]);
+});
+

@@ -1,8 +1,8 @@
-# Lienzo · Fase 02 (Propiedades, capas, degradados e historial)
+# Lienzo · Fase 03 (Texto avanzado: edición inline, Google Fonts, Auto-fit y Overflow)
 
-Editor de plantillas de imagen 100 % en navegador con React 18, Vite, react-konva y Zustand. Incluye el lienzo base de la Fase 01 y el alcance completo de la **Fase 02**: panel de capas, panel de propiedades por tipo de objeto, editor reutilizable de rellenos sólidos y degradados (`<Fill>` lineal y radial), edición del fondo del lienzo e historial de deshacer/rehacer (`undo/redo`).
+Editor de plantillas de imagen 100 % en navegador con React 18, Vite, react-konva, Zustand y `webfontloader`. Incluye el lienzo base de la **Fase 01**, el panel de capas/propiedades/degradados/`undo/redo` de la **Fase 02** y el alcance completo de la **Fase 03**: edición inline de texto sobre el canvas, carga dinámica de Google Fonts, `Auto-fit` en caja y control de `Overflow` (`ajustar`, `recortar`, `libre`), cumpliendo estrictamente el contrato `docs/02-esquema-plantilla.md` v2.
 
-> **El proyecto vive solo en memoria.** El mapeo de campos, la conexión con Google Sheets, la generación por lotes en ZIP y el guardado de plantilla corresponden a fases posteriores.
+> **El proyecto vive solo en memoria.** El mapeo de campos dinámicos, la conexión con Google Sheets, la generación por lotes en ZIP y el guardado de plantilla corresponden a fases posteriores.
 
 ## Arranque
 
@@ -17,16 +17,15 @@ Abre `http://localhost:5173`. Para comprobar la compilación de producción ejec
 
 ## Controles principales
 
+- **Texto avanzado (Fase 03)**:
+  - **Edición inline en el lienzo**: haz **doble clic** sobre cualquier objeto `texto` para editarlo directamente sobre su caja con la misma fuente, tamaño, color, alineación y rotación (`Enter` confirma, `Shift + Enter` inserta salto de línea, `Escape` cancela y restaura el valor anterior, clic fuera confirma).
+  - **Google Fonts dinámicas (`WebFont.load`)**: selector con catálogo curado (`Inter`, `Roboto`, `Open Sans`, `Lato`, `Montserrat`, `Poppins`, `Oswald`, `Playfair Display`, `Merriweather`, `Bebas Neue`) más campo libre para cargar cualquier otra familia de Google Fonts bajo demanda con indicador de estado de carga.
+  - **Auto-fit y Overflow**: toggle **Auto-fit en caja** (reduce progresivamente `fontSize` hasta mín. `8 px` para caber en `W × H` sin alterar dimensiones de la caja) y modos de desbordamiento **`Ajustar`**, **`Recortar`** (clipping Konva al bounding box) y **`Libre`**.
 - **Panel izquierdo (`Elementos` / `Capas`)**:
   - **Elementos**: insertar **Texto**, **Rectángulo**, **Círculo**, **Línea** o **Imagen** (archivo local o URL).
-  - **Capas**: lista ordenada (`1.ª = Fondo`, última = `Frente`), clic para seleccionar (`Shift + clic` selección múltiple), doble clic para renombrar, icono de ojo para mostrar/ocultar e icono de candado para bloquear/desbloquear en el lienzo.
-  - Reordenar capas arrastrando filas, con botones de barra o con **`Ctrl/Cmd + [`** (hacia el fondo) y **`Ctrl/Cmd + ]`** (hacia el frente).
-- **Panel derecho (`Propiedades`)**:
-  - Sin selección (o pulsando **Lienzo**): edita el **fondo del canvas** con el editor de `<Fill>`.
-  - Con una capa seleccionada: nombre, visibilidad, bloqueo, posición `X/Y` (enteros), tamaño (`W/H`, `Radio` o `Longitud`), rotación y opacidad (`0–1` con máximo 1 decimal), más propiedades específicas de cada tipo (`rect`, `circulo`, `linea`, `texto` con resaltado informativo de `{{campo}}`, `imagen` con candado de proporción, reemplazo y recorte básico).
-- **Editor de `<Fill>`**:
-  - Alterna entre **Sólido** (`color picker` + hexadecimal) y **Degradado** (**Lineal** `0–360°` con indicador visual del sentido o **Radial** con centro `X/Y %`).
-  - Barra interactiva de **2 a 8 paradas**: clic en la barra añade una parada interpolada, arrastrar mueve su posición (`0–100 %`) en vivo, y doble clic elimina una parada cuando hay más de 2.
+  - **Capas**: lista ordenada (`1.ª = Fondo`, última = `Frente`), selección simple/múltiple, doble clic para renombrar, ojo para mostrar/ocultar, candado para bloquear y reordenamiento drag & drop o con **`Ctrl/Cmd + [`** y **`Ctrl/Cmd + ]`**.
+- **Panel derecho (`Propiedades`) y `<Fill>`**:
+  - Edita el fondo del lienzo o las propiedades comunes y específicas de cada capa, con soporte completo de rellenos **Sólido** y **Degradado** (**Lineal** `0–360°` o **Radial** con 2–8 paradas).
 - **Historial y atajos**:
   - **`Ctrl/Cmd + Z`** deshacer · **`Ctrl/Cmd + Y`** (o `Ctrl/Cmd + Shift + Z`) rehacer.
   - **`Ctrl/Cmd + D`** duplicar · **`Supr` / `Backspace`** eliminar · **Flechas** mover `1 px` (`Shift` = `10 px`) · **`Espacio` + arrastrar** paneo · **Rueda** zoom al puntero (`25 %–300 %`).

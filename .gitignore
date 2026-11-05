@@ -4,6 +4,7 @@ playwright-report/
 test-results/
 .DS_Store
 .cache/
+.local/
 .npm/
 .arena/
 uploads/

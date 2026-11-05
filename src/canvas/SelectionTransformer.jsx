@@ -20,21 +20,25 @@ export default function SelectionTransformer({
   nodeRefs,
   selectedIds,
   objects,
+  textBoxes,
+  editingTextId,
   zoom,
   onTransformStart,
   onTransform,
   onTransformEnd,
 }) {
   const activeLayers = useMemo(
-    () => objects.filter((capa) => selectedIds.includes(capa.id) && capa.visible && !capa.bloqueada),
-    [objects, selectedIds],
+    () => objects.filter(
+      (capa) => selectedIds.includes(capa.id) && capa.visible && !capa.bloqueada && capa.id !== editingTextId,
+    ),
+    [editingTextId, objects, selectedIds],
   );
 
   const singleType = activeLayers.length === 1 ? activeLayers[0].tipo : null;
-  const keepRatio = activeLayers.length > 1 || singleType === 'circulo' || singleType === 'texto';
+  const keepRatio = activeLayers.length > 1 || singleType === 'circulo';
   const enabledAnchors = useMemo(() => {
     if (singleType === 'linea') return TIRADORES_LINEA;
-    if (singleType === 'circulo' || singleType === 'texto') return TIRADORES_ESQUINA;
+    if (singleType === 'circulo') return TIRADORES_ESQUINA;
     return TODOS_LOS_TIRADORES;
   }, [singleType]);
 
@@ -42,8 +46,9 @@ export default function SelectionTransformer({
     const transformer = transformerRef.current;
     if (!transformer) return;
     transformer.nodes(activeLayers.map((capa) => nodeRefs.current[capa.id]).filter(Boolean));
+    transformer.forceUpdate();
     transformer.getLayer()?.batchDraw();
-  }, [activeLayers, objects, nodeRefs, transformerRef]);
+  }, [activeLayers, objects, textBoxes, nodeRefs, transformerRef]);
 
   // DECISION: se desactiva la inversión de objetos porque el contrato no admite escalas negativas.
   return (
@@ -67,7 +72,8 @@ export default function SelectionTransformer({
         if (singleType === 'linea') {
           return Math.abs(newBox.width) < Math.max(4, zoom) ? oldBox : newBox;
         }
-        return Math.abs(newBox.width) < zoom || Math.abs(newBox.height) < zoom ? oldBox : newBox;
+        const minSize = singleType === 'texto' ? Math.max(8 * zoom, zoom) : zoom;
+        return Math.abs(newBox.width) < minSize || Math.abs(newBox.height) < minSize ? oldBox : newBox;
       }}
       onTransformStart={onTransformStart}
       onTransform={onTransform}

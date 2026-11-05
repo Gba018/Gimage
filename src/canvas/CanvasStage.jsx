@@ -1,10 +1,11 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { Group, Layer, Rect, Stage } from 'react-konva';
 import CanvasObject from './CanvasObject.jsx';
+import InlineTextEditor from './InlineTextEditor.jsx';
 import SelectionTransformer from './SelectionTransformer.jsx';
 import { ManualGuides, SmartGuides, Ruler } from './Guides.jsx';
 import { Icon } from '../components/Icons.jsx';
-import { useTemplateStore } from '../state/template-store.js';
+import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
 import { clamp, esFillOscuro, konvaFillProps } from '../template/schema.js';
 
 const MIN_ZOOM = 0.25;
@@ -36,8 +37,10 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const projectName = useTemplateStore((state) => state.template.nombre);
   const capas = useTemplateStore((state) => state.template.capas);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
+  const textBoxes = useTemplateStore((state) => state.textBoxes);
   const revision = useTemplateStore((state) => state.projectRevision);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
+  const updateObject = useTemplateStore((state) => state.updateObject);
   const updateObjects = useTemplateStore((state) => state.updateObjects);
   const addGuide = useTemplateStore((state) => state.addGuide);
 
@@ -59,7 +62,14 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const [panning, setPanning] = useState(false);
   const [draftGuide, setDraftGuide] = useState(null);
   const [smartGuides, setSmartGuides] = useState([]);
+  const [editingTextId, setEditingTextId] = useState(null);
   canvasRef.current = canvas;
+
+  useEffect(() => {
+    if (!editingTextId) return;
+    const activa = capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && capa.visible && !capa.bloqueada);
+    if (!activa) setEditingTextId(null);
+  }, [capas, editingTextId]);
 
   const changeView = useCallback((next) => {
     viewRef.current = next;
@@ -118,6 +128,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
       previousRevision.current = revision;
       setDraftGuide(null);
       setSmartGuides([]);
+      setEditingTextId(null);
       fitToScreen();
     }
   }, [revision, fitToScreen]);
@@ -306,8 +317,10 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     const ids = activas.map((capa) => capa.id);
     const nodes = ids.map((id) => nodeRefs.current[id]).filter(Boolean);
     const positions = {};
-    nodes.forEach((node) => {
-      positions[node.id()] = {
+    ids.forEach((id) => {
+      const node = nodeRefs.current[id];
+      if (!node) return;
+      positions[id] = {
         x: node.x(),
         y: node.y(),
         width: node.width(),
@@ -363,9 +376,10 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
       if (anchor === 'middle-right') anchorX = initial.x;
       if (anchor === 'top-center') anchorY = initial.y + initial.height;
       if (anchor === 'bottom-center') anchorY = initial.y;
-      nodes.forEach((node) => {
-        const original = session.positions[node.id()];
-        if (original) {
+      session.ids.forEach((id) => {
+        const node = nodeRefs.current[id];
+        const original = session.positions[id];
+        if (node && original) {
           node.setAttrs({
             x: anchorX + (original.x - anchorX) * factor,
             y: anchorY + (original.y - anchorY) * factor,
@@ -424,9 +438,16 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         node.points(points);
         cambios[id] = { x, y, rotation, linea: { points } };
       } else if (capa.tipo === 'texto') {
-        const fontSize = clamp(Math.round(capa.texto.fontSize * sx), 8, 600);
-        node.fontSize(fontSize);
-        cambios[id] = { x, y, rotation, texto: { fontSize } };
+        const cajaActual = obtenerCajaTexto(capa, state.textBoxes);
+        const width = Math.max(8, Math.round(cajaActual.width * sx));
+        const height = Math.max(8, Math.round(cajaActual.height * sy));
+        node.setAttrs({ width, height });
+        if (session.type === 'multiple') {
+          const fontSize = clamp(Math.round(capa.texto.fontSize * sx), 8, 600);
+          cambios[id] = { x, y, rotation, texto: { fontSize }, textBox: { width, height } };
+        } else {
+          cambios[id] = { x, y, rotation, textBox: { width, height } };
+        }
       }
     });
 
@@ -447,6 +468,11 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     width: canvas.width,
     height: canvas.height,
   });
+
+  const editingLayer = editingTextId
+    ? capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && capa.visible && !capa.bloqueada)
+    : null;
+  const editingBox = editingLayer ? obtenerCajaTexto(editingLayer, textBoxes) : null;
 
   return (
     <main className="workspace" aria-label="Editor de lienzo">
@@ -513,6 +539,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                       onDragStart={dragStart}
                       onDragMove={dragMove}
                       onDragEnd={dragEnd}
+                      onStartTextEdit={(layerId) => setEditingTextId(layerId)}
+                      isEditing={editingTextId === capa.id}
                       panMode={spacePressed || panning}
                     />
                   ))}
@@ -522,6 +550,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                   nodeRefs={nodeRefs}
                   selectedIds={selectedIds}
                   objects={capas}
+                  textBoxes={textBoxes}
+                  editingTextId={editingTextId}
                   zoom={view.scale}
                   onTransformStart={transformStart}
                   onTransform={transform}
@@ -532,6 +562,24 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                 <SmartGuides canvas={canvas} zoom={view.scale} smartGuides={smartGuides} />
               </Layer>
             </Stage>
+          )}
+          {editingLayer && editingBox && (
+            <InlineTextEditor
+              key={editingLayer.id}
+              layer={editingLayer}
+              box={editingBox}
+              view={view}
+              onCommit={(nuevoTexto) => {
+                if (nuevoTexto !== editingLayer.texto.texto) {
+                  updateObject(
+                    editingLayer.id,
+                    { texto: { ...editingLayer.texto, texto: nuevoTexto } },
+                  );
+                }
+                setEditingTextId(null);
+              }}
+              onCancel={() => setEditingTextId(null)}
+            />
           )}
           <div className="artboard-label" style={{ left: artboardLeft, top: artboardTop - 28 }} aria-hidden="true">
             <span>01</span>

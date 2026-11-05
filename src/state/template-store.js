@@ -1,9 +1,13 @@
 import { create } from 'zustand';
 import {
+  DEFAULT_TEXT_BOX,
+  MODOS_OVERFLOW_TEXTO,
   actualizarVersionPlantilla,
+  calcularFontSizeAutoFit,
   crearCapa,
   crearIdCapa,
   crearPlantillaVacia,
+  medirCajaTexto,
   normalizarFill,
 } from '../template/schema.js';
 
@@ -18,10 +22,74 @@ function clonar(valor) {
   return JSON.parse(JSON.stringify(valor));
 }
 
+export function normalizarCajaTexto(caja = {}, capa = null) {
+  const baseMedida = capa?.tipo === 'texto' && capa.texto
+    ? medirCajaTexto(capa.texto)
+    : DEFAULT_TEXT_BOX;
+  const width = Math.max(8, Math.round(Number(caja.width) || Math.max(DEFAULT_TEXT_BOX.width, baseMedida.width)));
+  const height = Math.max(8, Math.round(Number(caja.height) || Math.max(DEFAULT_TEXT_BOX.height, baseMedida.height)));
+  const overflow = MODOS_OVERFLOW_TEXTO.includes(caja.overflow)
+    ? caja.overflow
+    : (caja.autoFit ? 'ajustar' : 'libre');
+  const autoFit = overflow === 'ajustar';
+  return { width, height, overflow, autoFit };
+}
+
+export function obtenerCajaTexto(capa, textBoxes = {}) {
+  if (!capa || capa.tipo !== 'texto') return null;
+  return normalizarCajaTexto(textBoxes?.[capa.id], capa);
+}
+
+function sincronizarCambioCajaTexto(actual, parcial = {}) {
+  let overflow = actual.overflow;
+  let autoFit = actual.autoFit;
+
+  if (parcial.overflow !== undefined && MODOS_OVERFLOW_TEXTO.includes(parcial.overflow)) {
+    overflow = parcial.overflow;
+    autoFit = overflow === 'ajustar';
+  } else if (parcial.autoFit !== undefined) {
+    autoFit = Boolean(parcial.autoFit);
+    overflow = autoFit ? 'ajustar' : (actual.overflow === 'ajustar' ? 'libre' : actual.overflow);
+  }
+
+  const width = parcial.width !== undefined
+    ? Math.max(8, Math.round(Number(parcial.width) || actual.width))
+    : actual.width;
+  const height = parcial.height !== undefined
+    ? Math.max(8, Math.round(Number(parcial.height) || actual.height))
+    : actual.height;
+
+  return { width, height, overflow, autoFit };
+}
+
+function limpiarTextBoxes(capas, textBoxes = {}) {
+  const limpio = {};
+  capas.forEach((capa) => {
+    if (capa.tipo === 'texto' && textBoxes[capa.id]) {
+      limpio[capa.id] = normalizarCajaTexto(textBoxes[capa.id], capa);
+    }
+  });
+  return limpio;
+}
+
+function aplicarAutoFitACapa(capa, caja) {
+  if (!capa || capa.tipo !== 'texto' || !caja?.autoFit) return capa;
+  const nuevoFontSize = calcularFontSizeAutoFit(capa.texto, caja.width, caja.height);
+  if (nuevoFontSize === capa.texto.fontSize) return capa;
+  return {
+    ...capa,
+    texto: {
+      ...capa.texto,
+      fontSize: nuevoFontSize,
+    },
+  };
+}
+
 function crearSnapshot(state) {
   return {
     template: clonar(state.template),
     selectedIds: [...state.selectedIds],
+    textBoxes: clonar(state.textBoxes),
   };
 }
 
@@ -30,7 +98,7 @@ function filtrarSeleccionValida(capas, selectedIds) {
   return selectedIds.filter((id) => idsExistentes.has(id));
 }
 
-// La plantilla cumple estrictamente 02-esquema-plantilla.md v2; selección, guías e historial viven fuera del JSON.
+// DECISION: mantener las dimensiones de caja, overflow y autoFit de texto como estado de UI/render en Zustand (cubierto por undo/redo) sin añadir campos a template para respetar estrictamente 02-esquema-plantilla.md v2.
 export const useTemplateStore = create((set, get) => {
   function aplicarCambio(mutador, opciones = {}) {
     set((state) => {
@@ -43,10 +111,15 @@ export const useTemplateStore = create((set, get) => {
         nextTemplate.capas,
         resultado.selectedIds ?? state.selectedIds,
       );
+      const nextTextBoxes = limpiarTextBoxes(
+        nextTemplate.capas,
+        resultado.textBoxes ?? state.textBoxes,
+      );
 
       const sinCambiosTemplate = JSON.stringify(nextTemplate) === JSON.stringify(state.template);
       const sinCambiosSeleccion = JSON.stringify(nextSelectedIds) === JSON.stringify(state.selectedIds);
-      if (sinCambiosTemplate && sinCambiosSeleccion) return {};
+      const sinCambiosTextBoxes = JSON.stringify(nextTextBoxes) === JSON.stringify(state.textBoxes);
+      if (sinCambiosTemplate && sinCambiosSeleccion && sinCambiosTextBoxes) return {};
 
       const ahora = Date.now();
       const historyKey = opciones.historyKey || null;
@@ -65,6 +138,7 @@ export const useTemplateStore = create((set, get) => {
       return {
         template: nextTemplate,
         selectedIds: nextSelectedIds,
+        textBoxes: nextTextBoxes,
         past: nextPast,
         future: [],
         _batchPushed: state._batchDepth > 0 ? true : false,
@@ -78,6 +152,7 @@ export const useTemplateStore = create((set, get) => {
     // DECISION: abrir de inmediato un proyecto vacío de 1080 × 1080 en memoria.
     template: crearPlantillaVacia(),
     selectedIds: [],
+    textBoxes: {},
     guides: [],
     projectRevision: 0,
     past: [],
@@ -102,9 +177,11 @@ export const useTemplateStore = create((set, get) => {
     undo: () => set((state) => {
       if (state.past.length === 0) return {};
       const anterior = state.past[state.past.length - 1];
+      const tpl = clonar(anterior.template);
       return {
-        template: clonar(anterior.template),
-        selectedIds: filtrarSeleccionValida(anterior.template.capas, anterior.selectedIds),
+        template: tpl,
+        selectedIds: filtrarSeleccionValida(tpl.capas, anterior.selectedIds),
+        textBoxes: limpiarTextBoxes(tpl.capas, clonar(anterior.textBoxes || {})),
         past: state.past.slice(0, -1),
         future: [...state.future, crearSnapshot(state)],
         _batchDepth: 0,
@@ -116,9 +193,11 @@ export const useTemplateStore = create((set, get) => {
     redo: () => set((state) => {
       if (state.future.length === 0) return {};
       const siguiente = state.future[state.future.length - 1];
+      const tpl = clonar(siguiente.template);
       return {
-        template: clonar(siguiente.template),
-        selectedIds: filtrarSeleccionValida(siguiente.template.capas, siguiente.selectedIds),
+        template: tpl,
+        selectedIds: filtrarSeleccionValida(tpl.capas, siguiente.selectedIds),
+        textBoxes: limpiarTextBoxes(tpl.capas, clonar(siguiente.textBoxes || {})),
         past: [...state.past.slice(-(MAX_HISTORIAL - 1)), crearSnapshot(state)],
         future: state.future.slice(0, -1),
         _batchDepth: 0,
@@ -130,6 +209,7 @@ export const useTemplateStore = create((set, get) => {
     newProject: ({ name, nombre, width, height, background }) => set((state) => ({
       template: crearPlantillaVacia((nombre ?? name ?? '').trim() || 'Proyecto sin título', width, height, background),
       selectedIds: [],
+      textBoxes: {},
       guides: [],
       past: [],
       future: [],
@@ -162,6 +242,9 @@ export const useTemplateStore = create((set, get) => {
       aplicarCambio((state) => ({
         template: { ...state.template, capas: [...state.template.capas, capa] },
         selectedIds: [capa.id],
+        textBoxes: capa.tipo === 'texto'
+          ? { ...state.textBoxes, [capa.id]: { ...DEFAULT_TEXT_BOX } }
+          : state.textBoxes,
       }));
       return capa.id;
     },
@@ -201,12 +284,18 @@ export const useTemplateStore = create((set, get) => {
     updateObject: (id, cambios, opciones = {}) => aplicarCambio(
       (state) => {
         let huboCambio = false;
+        let nextTextBoxes = state.textBoxes;
         const capas = state.template.capas.map((capa) => {
           if (capa.id !== id) return capa;
           huboCambio = true;
-          const actualizada = { ...capa, ...cambios };
+          let actualizada = { ...capa, ...cambios };
           if (capa.tipo && cambios[capa.tipo]) {
             actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambios[capa.tipo] };
+          }
+          if (actualizada.tipo === 'texto') {
+            const caja = obtenerCajaTexto(actualizada, state.textBoxes);
+            nextTextBoxes = { ...nextTextBoxes, [id]: caja };
+            actualizada = aplicarAutoFitACapa(actualizada, caja);
           }
           return actualizada;
         });
@@ -217,23 +306,71 @@ export const useTemplateStore = create((set, get) => {
         return {
           template: { ...state.template, capas },
           selectedIds: siguienteSeleccion,
+          textBoxes: nextTextBoxes,
         };
+      },
+      { historyKey: opciones.historyKey ?? null },
+    ),
+
+    updateTextBox: (id, parcial, opciones = {}) => aplicarCambio(
+      (state) => {
+        const objetivo = state.template.capas.find((capa) => capa.id === id && capa.tipo === 'texto');
+        if (!objetivo) return null;
+        const cajaActual = obtenerCajaTexto(objetivo, state.textBoxes);
+        const nuevaCaja = sincronizarCambioCajaTexto(cajaActual, parcial);
+        const capas = state.template.capas.map((capa) => (
+          capa.id === id ? aplicarAutoFitACapa(capa, nuevaCaja) : capa
+        ));
+        return {
+          template: { ...state.template, capas },
+          textBoxes: { ...state.textBoxes, [id]: nuevaCaja },
+        };
+      },
+      { historyKey: opciones.historyKey ?? null },
+    ),
+
+    reapplyAutoFitForFont: (familia, opciones = {}) => aplicarCambio(
+      (state) => {
+        const objetivoFamilia = String(familia ?? '').trim().toLowerCase();
+        if (!objetivoFamilia) return null;
+        let huboAjuste = false;
+        const capas = state.template.capas.map((capa) => {
+          if (capa.tipo !== 'texto') return capa;
+          if (String(capa.texto?.fontFamily ?? '').trim().toLowerCase() !== objetivoFamilia) return capa;
+          const caja = obtenerCajaTexto(capa, state.textBoxes);
+          if (!caja?.autoFit) return capa;
+          const ajustada = aplicarAutoFitACapa(capa, caja);
+          if (ajustada !== capa) huboAjuste = true;
+          return ajustada;
+        });
+        return huboAjuste ? { template: { ...state.template, capas } } : null;
       },
       { historyKey: opciones.historyKey ?? null },
     ),
 
     updateObjects: (cambiosPorId, opciones = {}) => aplicarCambio(
       (state) => {
+        let nextTextBoxes = { ...state.textBoxes };
         const capas = state.template.capas.map((capa) => {
           const cambio = cambiosPorId[capa.id];
           if (!cambio) return capa;
-          const actualizada = { ...capa, ...cambio };
-          if (capa.tipo && cambio[capa.tipo]) {
-            actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambio[capa.tipo] };
+          const { textBox: cambioCaja, ...cambioCapa } = cambio;
+          let actualizada = { ...capa, ...cambioCapa };
+          if (capa.tipo && cambioCapa[capa.tipo]) {
+            actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambioCapa[capa.tipo] };
+          }
+          if (actualizada.tipo === 'texto') {
+            const actualCaja = obtenerCajaTexto(actualizada, nextTextBoxes);
+            const nuevaCaja = cambioCaja ? sincronizarCambioCajaTexto(actualCaja, cambioCaja) : actualCaja;
+            nextTextBoxes[capa.id] = nuevaCaja;
+            actualizada = aplicarAutoFitACapa(actualizada, nuevaCaja);
           }
           return actualizada;
         });
-        return { template: { ...state.template, capas } };
+        return {
+          template: { ...state.template, capas },
+          textBoxes: nextTextBoxes,
+        };
       },
       { historyKey: opciones.historyKey ?? null },
     ),
@@ -345,19 +482,24 @@ export const useTemplateStore = create((set, get) => {
       );
       if (!seleccionadas.length) return null;
       const ids = state.template.capas.map((capa) => capa.id);
+      const nextTextBoxes = { ...state.textBoxes };
       const copias = seleccionadas.map((capa) => {
         const copia = clonar(capa);
         copia.id = crearIdCapa(ids);
         ids.push(copia.id);
         copia.nombre = `${capa.nombre} copia`;
         // DECISION: desplazar las copias 24 px para que no queden ocultas bajo el original.
-        copia.x = Math.round(copia.x + 24);
-        copia.y = Math.round(copia.y + 24);
+        copia.x = Math.round(capa.x + 24);
+        copia.y = Math.round(capa.y + 24);
+        if (capa.tipo === 'texto') {
+          nextTextBoxes[copia.id] = clonar(obtenerCajaTexto(capa, state.textBoxes));
+        }
         return copia;
       });
       return {
         template: { ...state.template, capas: [...state.template.capas, ...copias] },
         selectedIds: copias.map((copia) => copia.id),
+        textBoxes: nextTextBoxes,
       };
     }),
 
