@@ -3,7 +3,7 @@ import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from 'react-konv
 import { cargarGoogleFont, estadoGoogleFont, suscribirFuentes } from './font-loader.js';
 import { cargarImagen } from './image-loader.js';
 import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
-import { konvaFillProps, normalizarStroke } from '../template/schema.js';
+import { DEFAULT_TEXT_BOX, konvaFillProps, normalizarStroke } from '../template/schema.js';
 
 function usarImagen(src) {
   const [image, setImage] = useState(null);
@@ -32,15 +32,10 @@ export default function CanvasObject({
 }) {
   const selectObject = useTemplateStore((state) => state.selectObject);
   const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
-  const rawTextBox = useTemplateStore((state) => (
-    object.tipo === 'texto' ? state.textBoxes[object.id] : null
-  ));
 
   const textBox = useMemo(
-    () => (object.tipo === 'texto'
-      ? obtenerCajaTexto(object, rawTextBox ? { [object.id]: rawTextBox } : {})
-      : null),
-    [object, rawTextBox],
+    () => (object.tipo === 'texto' ? obtenerCajaTexto(object) : null),
+    [object],
   );
 
   const textBoxRef = useRef(textBox);
@@ -116,11 +111,9 @@ export default function CanvasObject({
         };
       };
     } else if (node && object.tipo === 'texto') {
-      // Mantiene el bounding box del Group anclado a width × height de la caja de texto en los 3 modos de overflow.
+      // Mantiene el bounding box del Group anclado a width × height de capa.texto.caja en los 3 modos de overflow.
       node.getClientRect = function getClientRectTexto(config = {}) {
-        const caja = textBoxRef.current || { width: 520, height: 80 };
-        const sx = node.scaleX();
-        const sy = node.scaleY();
+        const caja = textBoxRef.current || DEFAULT_TEXT_BOX;
         const selfRect = {
           x: 0,
           y: 0,
@@ -235,7 +228,7 @@ export default function CanvasObject({
   }
 
   if (object.tipo === 'texto') {
-    const box = textBox || { width: 520, height: 80, overflow: 'libre', autoFit: false };
+    const box = textBox || DEFAULT_TEXT_BOX;
     const recortar = box.overflow === 'recortar';
     const fillProps = konvaFillProps(object.texto.fill, {
       minX: 0,

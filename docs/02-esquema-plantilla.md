@@ -1,14 +1,15 @@
-# 02 — Esquema de plantilla (contrato JSON) — v2
+# 02 — Esquema de plantilla (contrato JSON) — v3
 
 Toda plantilla se guarda/serializa con esta forma. El agente codificador NO debe inventar campos fuera de este contrato; si falta algo, preguntar.
 
 ## Versionado
-- `version: 1` — plantillas de la fase 01 (solo rellenos sólidos, cadenas hex).
-- `version: 2` — admite **degradados**. Obligatorio usar `version: 2` en cuanto la plantilla contenga al menos un degradado (fondo, forma o texto).
+- `version: 1` — plantillas de la fase 01 (solo rellenos sólidos, cadenas hex, sin textos con `caja`).
+- `version: 2` — admite **degradados** (obligatorio usar `version: 2` cuando la plantilla contenga al menos un degradado y no tenga textos con `caja`).
+- `version: 3` — admite **`texto.caja`** (`width`, `height`, `autoFit`, `overflow`). Obligatorio usar `version: 3` cuando exista al menos un texto con `caja`. Al leer plantillas v1/v2 sin `caja`, se derivan sus dimensiones iniciales y se aplican defaults (`autoFit: false`, `overflow: "libre"`).
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "nombre": "Plantilla oferta",
   "canvas": {
     "width": 1080,
@@ -27,7 +28,22 @@ Toda plantilla se guarda/serializa con esta forma. El agente codificador NO debe
       "rect":   { "width": 500, "height": 300, "fill": <Fill>, "stroke": <Stroke>, "cornerRadius": 12 },
       "circulo":{ "radius": 120, "fill": <Fill>, "stroke": <Stroke> },
       "linea":  { "points": [0,0, 200,0], "stroke": <Stroke>, "strokeWidth": 4 },
-      "texto":  { "texto": "Hola {{nombre}}", "fontFamily": "Inter", "fontSize": 48, "fill": <Fill>, "align": "left|center|right", "fontStyle": "normal|bold", "letterSpacing": 0, "lineHeight": 1.2 },
+      "texto":  {
+        "texto": "Hola {{nombre}}",
+        "fontFamily": "Inter",
+        "fontSize": 48,
+        "fill": <Fill>,
+        "align": "left|center|right",
+        "fontStyle": "normal|bold",
+        "letterSpacing": 0,
+        "lineHeight": 1.2,
+        "caja": {
+          "width": 500,
+          "height": 120,
+          "autoFit": false,
+          "overflow": "libre"
+        }
+      },
       "imagen": { "src": "dataURL", "width": 400, "height": 300 }
     }
   ]

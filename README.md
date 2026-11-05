@@ -1,6 +1,6 @@
 # Lienzo · Fase 03 (Texto avanzado: edición inline, Google Fonts, Auto-fit y Overflow)
 
-Editor de plantillas de imagen 100 % en navegador con React 18, Vite, react-konva, Zustand y `webfontloader`. Incluye el lienzo base de la **Fase 01**, el panel de capas/propiedades/degradados/`undo/redo` de la **Fase 02** y el alcance completo de la **Fase 03**: edición inline de texto sobre el canvas, carga dinámica de Google Fonts, `Auto-fit` en caja y control de `Overflow` (`ajustar`, `recortar`, `libre`), cumpliendo estrictamente el contrato `docs/02-esquema-plantilla.md` v2.
+Editor de plantillas de imagen 100 % en navegador con React 18, Vite, react-konva, Zustand y `webfontloader`. Incluye el lienzo base de la **Fase 01**, el panel de capas/propiedades/degradados/`undo/redo` de la **Fase 02** y el alcance completo de la **Fase 03 + persistencia de caja**: edición inline de texto sobre el canvas, carga dinámica de Google Fonts, `Auto-fit` en caja y control de `Overflow` (`ajustar`, `recortar`, `libre`) persistidos en `capas[].texto.caja` bajo el contrato `docs/02-esquema-plantilla.md` v3 (con retrocompatibilidad v1/v2).
 
 > **El proyecto vive solo en memoria.** El mapeo de campos dinámicos, la conexión con Google Sheets, la generación por lotes en ZIP y el guardado de plantilla corresponden a fases posteriores.
 

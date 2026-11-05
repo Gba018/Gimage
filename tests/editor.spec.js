@@ -16,7 +16,6 @@ async function state(page) {
     return {
       template: store.template,
       selectedIds: store.selectedIds,
-      textBoxes: store.textBoxes,
       guides: store.guides,
       pastCount: store.past.length,
       futureCount: store.future.length,
@@ -175,9 +174,16 @@ test('inserta los cinco tipos de capa centrados tras pan y zoom y cumple estrict
   expect(template.capas[2].x + template.capas[2].linea.points[2] / 2).toBe(540);
   expect(template.capas[2].y).toBe(540);
 
+  expect(template.version).toBe(3);
   expect(Object.keys(template.capas[3].texto).sort()).toEqual([
-    'texto', 'fontFamily', 'fontSize', 'fill', 'align', 'fontStyle', 'letterSpacing', 'lineHeight',
+    'texto', 'fontFamily', 'fontSize', 'fill', 'align', 'fontStyle', 'letterSpacing', 'lineHeight', 'caja',
   ].sort());
+  expect(template.capas[3].texto.caja).toEqual({
+    width: 500,
+    height: 120,
+    autoFit: false,
+    overflow: 'libre',
+  });
 
   expect(Object.keys(template.capas[4].imagen).sort()).toEqual(['src', 'width', 'height'].sort());
   expect(template.capas[4].imagen.src).toMatch(/^data:image\/svg\+xml;base64,/);
@@ -710,7 +716,7 @@ test('Fase 03: edición inline con doble clic en canvas, Enter, Escape, clic fue
   await page.getByRole('button', { name: 'Añadir texto' }).click();
   let current = await state(page);
   const textLayer = current.template.capas[0];
-  const box = current.textBoxes[textLayer.id];
+  const box = textLayer.texto.caja;
 
   // Aplicar zoom y rotación antes de editar inline para comprobar conversión a pantalla y rotación CSS
   await page.getByRole('button', { name: 'Acercar' }).click();
@@ -719,7 +725,7 @@ test('Fase 03: edición inline con doble clic en canvas, Enter, Escape, clic fue
 
   current = await state(page);
   const rotatedLayer = current.template.capas[0];
-  // Punto cercano a la esquina superior-izquierda rotada 15° sigue cayendo dentro del cuadro 520x80
+  // Punto cercano a la esquina superior-izquierda rotada 15° sigue cayendo dentro del cuadro 500x120
   const clickTarget = await point(page, rotatedLayer.x + 80, rotatedLayer.y + 45);
   await page.mouse.dblclick(clickTarget.x, clickTarget.y);
 
@@ -773,8 +779,8 @@ test('Fase 03: edición inline con doble clic en canvas, Enter, Escape, clic fue
   current = await state(page);
   const centerPoint = await point(
     page,
-    current.template.capas[0].x + current.textBoxes[textLayer.id].width / 2,
-    current.template.capas[0].y + current.textBoxes[textLayer.id].height / 2,
+    current.template.capas[0].x + current.template.capas[0].texto.caja.width / 2,
+    current.template.capas[0].y + current.template.capas[0].texto.caja.height / 2,
   );
 
   // 2) Escape cancela y restaura el valor anterior sin registrar paso extra en undo
@@ -862,14 +868,15 @@ test('Fase 03: Google Fonts dinámicas del catálogo curado, familia adicional l
   expect(pacificoLoaded).toBe(true);
 
   const current = await state(page);
+  expect(current.template.version).toBe(3);
   expect(current.template.capas[0].texto.fontFamily).toBe('Pacifico');
-  // Contrato JSON intacto
+  // Contrato JSON v3 con texto.caja
   expect(Object.keys(current.template.capas[0].texto).sort()).toEqual([
-    'align', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
+    'align', 'caja', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
   ]);
 });
 
-test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxeles de Konva, undo/redo y esquema v2', async ({ page }) => {
+test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxeles de Konva, undo/redo y esquema v3', async ({ page }) => {
   await page.getByRole('button', { name: 'Añadir texto' }).click();
 
   // Posicionar en (100, 100) con caja 240 x 70 y tamaño inicial 48 px
@@ -889,13 +896,13 @@ test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxe
   );
 
   let current = await state(page);
-  const textId = current.template.capas[0].id;
+  expect(current.template.version).toBe(3);
   expect(current.template.capas[0].texto.fontSize).toBe(48);
-  expect(current.textBoxes[textId]).toEqual({
+  expect(current.template.capas[0].texto.caja).toEqual({
     width: 240,
     height: 70,
-    overflow: 'libre',
     autoFit: false,
+    overflow: 'libre',
   });
 
   // Helper que cuenta píxeles oscuros del objeto dentro y debajo de la caja (100, 100, 240, 70) sin el marco del Transformer
@@ -940,8 +947,8 @@ test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxe
   // 2) Cambiar Overflow a "recortar": NO debe dibujar ningún píxel de texto fuera del bounding box
   await page.getByRole('button', { name: 'Overflow recortar' }).click();
   current = await state(page);
-  expect(current.textBoxes[textId].overflow).toBe('recortar');
-  expect(current.textBoxes[textId].autoFit).toBe(false);
+  expect(current.template.capas[0].texto.caja.overflow).toBe('recortar');
+  expect(current.template.capas[0].texto.caja.autoFit).toBe(false);
   expect(current.template.capas[0].texto.fontSize).toBe(48);
 
   const pixelesRecortar = await contarPixelesTexto();
@@ -952,11 +959,11 @@ test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxe
   await page.getByRole('button', { name: 'Auto-fit de texto' }).click();
   current = await state(page);
   const reducedFontSize = current.template.capas[0].texto.fontSize;
-  expect(current.textBoxes[textId]).toEqual({
+  expect(current.template.capas[0].texto.caja).toEqual({
     width: 240,
     height: 70,
-    overflow: 'ajustar',
     autoFit: true,
+    overflow: 'ajustar',
   });
   expect(reducedFontSize).toBeLessThan(48);
   expect(reducedFontSize).toBeGreaterThanOrEqual(8);
@@ -966,41 +973,182 @@ test('Fase 03: Auto-fit, Overflow (ajustar, recortar, libre) verificado en píxe
   expect(pixelesAjustar.insideDark).toBeGreaterThan(30);
   expect(pixelesAjustar.outsideDark).toBe(0);
 
-  // 4) Undo y Redo restauran tanto fontSize como modo de overflow/autoFit sin ensuciar el esquema JSON v2
+  // 4) Undo y Redo restauran tanto fontSize como capa.texto.caja
   await page.keyboard.press('Control+z');
   current = await state(page);
-  expect(current.textBoxes[textId].overflow).toBe('recortar');
-  expect(current.textBoxes[textId].autoFit).toBe(false);
+  expect(current.template.capas[0].texto.caja.overflow).toBe('recortar');
+  expect(current.template.capas[0].texto.caja.autoFit).toBe(false);
   expect(current.template.capas[0].texto.fontSize).toBe(48);
 
   await page.keyboard.press('Control+y');
   current = await state(page);
-  expect(current.textBoxes[textId].overflow).toBe('ajustar');
-  expect(current.textBoxes[textId].autoFit).toBe(true);
+  expect(current.template.capas[0].texto.caja.overflow).toBe('ajustar');
+  expect(current.template.capas[0].texto.caja.autoFit).toBe(true);
   expect(current.template.capas[0].texto.fontSize).toBe(reducedFontSize);
 
   // 5) Al cambiar a una fuente más ancha (Merriweather) o encoger la caja con Transformer, Auto-fit re-mide sin alterar width/height inesperadamente
   await page.getByLabel('Seleccionar fuente usada').selectOption('Merriweather');
   await expect.poll(async () => page.evaluate(() => document.fonts.check('16px "Merriweather"'))).toBe(true);
   current = await state(page);
-  expect(current.textBoxes[textId].width).toBe(240);
-  expect(current.textBoxes[textId].height).toBe(70);
+  expect(current.template.capas[0].texto.caja.width).toBe(240);
+  expect(current.template.capas[0].texto.caja.height).toBe(70);
   expect((await contarPixelesTexto()).outsideDark).toBe(0);
 
   // Encoger el ancho de la caja desde el tirador middle-right del Transformer
   const sizeBeforeDrag = current.template.capas[0].texto.fontSize;
   await drag(page, await anchor(page, 'middle-right'), -60 * current.view.scale, 0);
   current = await state(page);
-  expect(current.textBoxes[textId].width).toBeLessThan(200);
+  expect(current.template.capas[0].texto.caja.width).toBeLessThan(200);
   expect(current.template.capas[0].texto.fontSize).toBeLessThanOrEqual(sizeBeforeDrag);
 
-  // Validar contrato estricto 02-esquema-plantilla.md v2 (sin ningún campo extra en template ni en capa.texto)
+  // Validar contrato estricto 02-esquema-plantilla.md v3
   expect(Object.keys(current.template).sort()).toEqual(['canvas', 'capas', 'nombre', 'version']);
   expect(Object.keys(current.template.capas[0]).sort()).toEqual([
     'bloqueada', 'id', 'nombre', 'opacity', 'rotation', 'texto', 'tipo', 'visible', 'x', 'y',
   ]);
   expect(Object.keys(current.template.capas[0].texto).sort()).toEqual([
-    'align', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
+    'align', 'caja', 'fill', 'fontFamily', 'fontSize', 'fontStyle', 'letterSpacing', 'lineHeight', 'texto',
   ]);
+  expect(Object.keys(current.template.capas[0].texto.caja).sort()).toEqual([
+    'autoFit', 'height', 'overflow', 'width',
+  ]);
+});
+
+test('Corrección post-fase 03: serialización de texto.caja (version 3), reconstrucción fiel, compatibilidad v2 sin caja y undo/redo', async ({ page }) => {
+  // 1) Crear un texto, definir caja (320 x 90), contenido largo y activar Auto-fit (overflow: "ajustar")
+  await page.getByRole('button', { name: 'Añadir texto' }).click();
+  await page.getByLabel('Ancho del texto').fill('320');
+  await page.getByLabel('Ancho del texto').blur();
+  await page.getByLabel('Alto del texto').fill('90');
+  await page.getByLabel('Alto del texto').blur();
+  await page.getByLabel('Contenido del texto').fill('Oferta exclusiva válida durante toda la semana en sucursales adheridas');
+  await page.getByRole('button', { name: 'Auto-fit de texto' }).click();
+
+  // 2) Serializar el estado interno: caja debe aparecer en capa.texto con version: 3 y fontSize final de auto-fit
+  const serializedJson = await page.evaluate(async () => {
+    const resource = performance
+      .getEntriesByType('resource')
+      .find((item) => new URL(item.name).pathname === '/src/state/template-store.js');
+    const store = (await import(resource?.name || '/src/state/template-store.js')).useTemplateStore.getState();
+    return JSON.stringify(store.template);
+  });
+
+  const parsedV3 = JSON.parse(serializedJson);
+  expect(parsedV3.version).toBe(3);
+  expect(parsedV3.capas[0].texto.caja).toEqual({
+    width: 320,
+    height: 90,
+    autoFit: true,
+    overflow: 'ajustar',
+  });
+  expect(parsedV3.capas[0].texto.fontSize).toBeLessThan(48);
+  const autoFittedSize = parsedV3.capas[0].texto.fontSize;
+
+  // 3) Vaciar el proyecto y reconstruir el estado desde esa estructura serializada: caja y comportamiento se restauran
+  await page.getByRole('button', { name: 'Nuevo proyecto' }).click();
+  await page.getByRole('button', { name: 'Crear lienzo' }).click();
+  expect((await state(page)).template.capas).toHaveLength(0);
+
+  await page.evaluate(async (rawJson) => {
+    const resource = performance
+      .getEntriesByType('resource')
+      .find((item) => new URL(item.name).pathname === '/src/state/template-store.js');
+    const store = (await import(resource?.name || '/src/state/template-store.js')).useTemplateStore.getState();
+    store.loadTemplate(JSON.parse(rawJson));
+  }, serializedJson);
+
+  let current = await state(page);
+  expect(current.template.version).toBe(3);
+  expect(current.template.capas[0].texto.caja).toEqual({
+    width: 320,
+    height: 90,
+    autoFit: true,
+    overflow: 'ajustar',
+  });
+  expect(current.template.capas[0].texto.fontSize).toBe(autoFittedSize);
+
+  // Seleccionar la capa restaurada y comprobar que el panel refleja fielmente caja, auto-fit y overflow
+  await page.getByRole('tab', { name: /Capas/ }).click();
+  await page.getByTestId(`layer-item-${current.template.capas[0].id}`).click();
+  await expect(page.getByLabel('Ancho del texto')).toHaveValue('320');
+  await expect(page.getByLabel('Alto del texto')).toHaveValue('90');
+  await expect(page.getByRole('button', { name: 'Auto-fit de texto' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Overflow ajustar' })).toHaveAttribute('aria-pressed', 'true');
+
+  // Cambiar a Overflow recortar y verificar Undo / Redo sobre capa.texto.caja
+  await page.getByRole('button', { name: 'Overflow recortar' }).click();
+  expect((await state(page)).template.capas[0].texto.caja).toEqual({
+    width: 320,
+    height: 90,
+    autoFit: false,
+    overflow: 'recortar',
+  });
+  await page.keyboard.press('Control+z');
+  expect((await state(page)).template.capas[0].texto.caja.overflow).toBe('ajustar');
+  await page.keyboard.press('Control+y');
+  expect((await state(page)).template.capas[0].texto.caja.overflow).toBe('recortar');
+
+  // 4) Cargar una plantilla v2 legada SIN campo `caja`: debe hidratar defaults derivados y seguir funcionando
+  const legacyV2Template = {
+    version: 2,
+    nombre: 'Plantilla v2 legada',
+    canvas: {
+      width: 1080,
+      height: 1080,
+      background: {
+        fill: {
+          type: 'linear',
+          angle: 90,
+          stops: [
+            { offset: 0, color: '#ffffff' },
+            { offset: 1, color: '#eef4ee' },
+          ],
+        },
+      },
+    },
+    capas: [
+      {
+        id: 'obj_legv2a',
+        tipo: 'texto',
+        nombre: 'Titular legado',
+        visible: true,
+        bloqueada: false,
+        x: 200,
+        y: 300,
+        rotation: 0,
+        opacity: 1,
+        texto: {
+          texto: 'Texto heredado sin caja',
+          fontFamily: 'Inter',
+          fontSize: 42,
+          fill: '#112211',
+          align: 'left',
+          fontStyle: 'bold',
+          letterSpacing: 0,
+          lineHeight: 1.2,
+        },
+      },
+    ],
+  };
+
+  await page.evaluate(async (tpl) => {
+    const resource = performance
+      .getEntriesByType('resource')
+      .find((item) => new URL(item.name).pathname === '/src/state/template-store.js');
+    const store = (await import(resource?.name || '/src/state/template-store.js')).useTemplateStore.getState();
+    store.loadTemplate(tpl);
+  }, legacyV2Template);
+
+  current = await state(page);
+  const hydratedText = current.template.capas[0].texto;
+  expect(current.template.version).toBe(3);
+  expect(hydratedText.caja.width).toBeGreaterThanOrEqual(500);
+  expect(hydratedText.caja.height).toBeGreaterThanOrEqual(120);
+  expect(hydratedText.caja.autoFit).toBe(false);
+  expect(hydratedText.caja.overflow).toBe('libre');
+
+  // Además, si una capa sin caja llegase directamente al canvas sin pasar por loadTemplate, el render sigue funcionando con defaults
+  const konvaTextContent = await page.evaluate(() => window.Konva.stages[0].findOne('#obj_legv2a')?.text());
+  expect(konvaTextContent).toBe('Texto heredado sin caja');
 });
 

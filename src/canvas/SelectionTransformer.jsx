@@ -20,7 +20,6 @@ export default function SelectionTransformer({
   nodeRefs,
   selectedIds,
   objects,
-  textBoxes,
   editingTextId,
   zoom,
   onTransformStart,
@@ -48,7 +47,7 @@ export default function SelectionTransformer({
     transformer.nodes(activeLayers.map((capa) => nodeRefs.current[capa.id]).filter(Boolean));
     transformer.forceUpdate();
     transformer.getLayer()?.batchDraw();
-  }, [activeLayers, objects, textBoxes, nodeRefs, transformerRef]);
+  }, [activeLayers, objects, nodeRefs, transformerRef]);
 
   // DECISION: se desactiva la inversión de objetos porque el contrato no admite escalas negativas.
   return (

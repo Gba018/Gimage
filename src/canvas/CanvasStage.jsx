@@ -37,7 +37,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const projectName = useTemplateStore((state) => state.template.nombre);
   const capas = useTemplateStore((state) => state.template.capas);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
-  const textBoxes = useTemplateStore((state) => state.textBoxes);
   const revision = useTemplateStore((state) => state.projectRevision);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
   const updateObject = useTemplateStore((state) => state.updateObject);
@@ -438,15 +437,15 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         node.points(points);
         cambios[id] = { x, y, rotation, linea: { points } };
       } else if (capa.tipo === 'texto') {
-        const cajaActual = obtenerCajaTexto(capa, state.textBoxes);
+        const cajaActual = obtenerCajaTexto(capa);
         const width = Math.max(8, Math.round(cajaActual.width * sx));
         const height = Math.max(8, Math.round(cajaActual.height * sy));
         node.setAttrs({ width, height });
         if (session.type === 'multiple') {
           const fontSize = clamp(Math.round(capa.texto.fontSize * sx), 8, 600);
-          cambios[id] = { x, y, rotation, texto: { fontSize }, textBox: { width, height } };
+          cambios[id] = { x, y, rotation, texto: { fontSize, caja: { ...cajaActual, width, height } } };
         } else {
-          cambios[id] = { x, y, rotation, textBox: { width, height } };
+          cambios[id] = { x, y, rotation, texto: { caja: { ...cajaActual, width, height } } };
         }
       }
     });
@@ -472,7 +471,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const editingLayer = editingTextId
     ? capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && capa.visible && !capa.bloqueada)
     : null;
-  const editingBox = editingLayer ? obtenerCajaTexto(editingLayer, textBoxes) : null;
+  const editingBox = editingLayer ? obtenerCajaTexto(editingLayer) : null;
 
   return (
     <main className="workspace" aria-label="Editor de lienzo">
@@ -550,7 +549,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                   nodeRefs={nodeRefs}
                   selectedIds={selectedIds}
                   objects={capas}
-                  textBoxes={textBoxes}
                   editingTextId={editingTextId}
                   zoom={view.scale}
                   onTransformStart={transformStart}

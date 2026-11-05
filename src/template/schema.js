@@ -6,10 +6,10 @@ const HEX_LARGO = /^#?([0-9a-f]{6})$/i;
 export const MIN_AUTO_FIT_FONT_SIZE = 8;
 export const MODOS_OVERFLOW_TEXTO = ['ajustar', 'recortar', 'libre'];
 export const DEFAULT_TEXT_BOX = {
-  width: 520,
-  height: 80,
-  overflow: 'libre',
+  width: 500,
+  height: 120,
   autoFit: false,
+  overflow: 'libre',
 };
 
 export const clamp = (valor, min, max) => Math.min(max, Math.max(min, valor));
@@ -239,8 +239,20 @@ export function plantillaTieneDegradado(plantilla) {
   });
 }
 
+export function plantillaTieneTextoConCaja(plantilla) {
+  if (!plantilla) return false;
+  return (plantilla.capas || []).some(
+    (capa) => capa.tipo === 'texto' && capa.texto && typeof capa.texto.caja === 'object' && capa.texto.caja !== null,
+  );
+}
+
 export function actualizarVersionPlantilla(plantilla) {
-  const version = plantillaTieneDegradado(plantilla) ? 2 : 1;
+  let version = 1;
+  if (plantillaTieneTextoConCaja(plantilla)) {
+    version = 3;
+  } else if (plantillaTieneDegradado(plantilla)) {
+    version = 2;
+  }
   return plantilla.version === version ? plantilla : { ...plantilla, version };
 }
 
@@ -394,6 +406,98 @@ export function calcularFontSizeAutoFit(textoSpec = {}, boxWidth = DEFAULT_TEXT_
   return MIN_AUTO_FIT_FONT_SIZE;
 }
 
+// DECISION: al leer plantillas v1/v2 sin texto.caja, derivar width/height desde la medición real con mínimo 500×120 y aplicar autoFit: false, overflow: "libre".
+export function normalizarCajaTexto(caja, textoSpec = null) {
+  if (!caja || typeof caja !== 'object') {
+    const medida = textoSpec ? medirCajaTexto(textoSpec) : DEFAULT_TEXT_BOX;
+    return {
+      width: Math.max(DEFAULT_TEXT_BOX.width, Math.round(Number(medida.width) || DEFAULT_TEXT_BOX.width)),
+      height: Math.max(DEFAULT_TEXT_BOX.height, Math.round(Number(medida.height) || DEFAULT_TEXT_BOX.height)),
+      autoFit: false,
+      overflow: 'libre',
+    };
+  }
+
+  let overflow = MODOS_OVERFLOW_TEXTO.includes(caja.overflow) ? caja.overflow : 'libre';
+  let autoFit = Boolean(caja.autoFit);
+  if (caja.overflow !== undefined && MODOS_OVERFLOW_TEXTO.includes(caja.overflow)) {
+    autoFit = overflow === 'ajustar';
+  } else if (caja.autoFit !== undefined) {
+    overflow = autoFit ? 'ajustar' : 'libre';
+  }
+
+  return {
+    width: Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(caja.width) || DEFAULT_TEXT_BOX.width)),
+    height: Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(caja.height) || DEFAULT_TEXT_BOX.height)),
+    autoFit,
+    overflow,
+  };
+}
+
+export function sincronizarCambioCajaTexto(actual, parcial = {}) {
+  const base = normalizarCajaTexto(actual);
+  let overflow = base.overflow;
+  let autoFit = base.autoFit;
+
+  if (parcial.overflow !== undefined && MODOS_OVERFLOW_TEXTO.includes(parcial.overflow)) {
+    overflow = parcial.overflow;
+    autoFit = overflow === 'ajustar';
+  } else if (parcial.autoFit !== undefined) {
+    autoFit = Boolean(parcial.autoFit);
+    overflow = autoFit ? 'ajustar' : (base.overflow === 'ajustar' ? 'libre' : base.overflow);
+  }
+
+  const width = parcial.width !== undefined
+    ? Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(parcial.width) || base.width))
+    : base.width;
+  const height = parcial.height !== undefined
+    ? Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(parcial.height) || base.height))
+    : base.height;
+
+  return { width, height, autoFit, overflow };
+}
+
+export function hidratarPlantilla(plantillaEntrada) {
+  if (!plantillaEntrada || typeof plantillaEntrada !== 'object') {
+    return crearPlantillaVacia();
+  }
+  const canvasWidth = Math.max(1, Math.round(Number(plantillaEntrada.canvas?.width) || 1080));
+  const canvasHeight = Math.max(1, Math.round(Number(plantillaEntrada.canvas?.height) || 1080));
+  const canvasFill = normalizarFill(plantillaEntrada.canvas?.background?.fill, '#ffffff');
+  const capasEntrada = Array.isArray(plantillaEntrada.capas) ? plantillaEntrada.capas : [];
+
+  const capas = capasEntrada.map((capa) => {
+    const tipo = normalizarTipoCapa(capa.tipo);
+    if (tipo !== 'texto' || !capa.texto) return { ...capa, tipo };
+    const caja = normalizarCajaTexto(capa.texto.caja, capa.texto);
+    const fontSizeBase = Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(capa.texto.fontSize) || 48));
+    const textoNormalizado = {
+      ...capa.texto,
+      fontSize: fontSizeBase,
+      caja,
+    };
+    if (caja.autoFit) {
+      textoNormalizado.fontSize = calcularFontSizeAutoFit(textoNormalizado, caja.width, caja.height);
+    }
+    return {
+      ...capa,
+      tipo,
+      texto: textoNormalizado,
+    };
+  });
+
+  return actualizarVersionPlantilla({
+    version: Number(plantillaEntrada.version) || 1,
+    nombre: String(plantillaEntrada.nombre ?? 'Proyecto sin título'),
+    canvas: {
+      width: canvasWidth,
+      height: canvasHeight,
+      background: { fill: canvasFill },
+    },
+    capas,
+  });
+}
+
 export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
   const tipo = normalizarTipoCapa(tipoEntrada);
   const nombresBase = {
@@ -457,6 +561,7 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
       strokeWidth: 4,
     };
   } else if (tipo === 'texto') {
+    const caja = { ...DEFAULT_TEXT_BOX };
     const textoSpec = {
       texto: 'Doble clic para editar',
       fontFamily: 'Inter',
@@ -466,9 +571,10 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
       fontStyle: 'bold',
       letterSpacing: 0,
       lineHeight: 1.2,
+      caja,
     };
-    capa.x = Math.round(cx - DEFAULT_TEXT_BOX.width / 2);
-    capa.y = Math.round(cy - DEFAULT_TEXT_BOX.height / 2);
+    capa.x = Math.round(cx - caja.width / 2);
+    capa.y = Math.round(cy - caja.height / 2);
     capa.texto = textoSpec;
   } else if (tipo === 'imagen') {
     const dims = dimensionesInicialesImagen(opciones.naturalWidth, opciones.naturalHeight);

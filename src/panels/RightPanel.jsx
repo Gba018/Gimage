@@ -40,7 +40,6 @@ export default function RightPanel({
 }) {
   const template = useTemplateStore((state) => state.template);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
-  const textBoxes = useTemplateStore((state) => state.textBoxes);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
   const setCanvasBackground = useTemplateStore((state) => state.setCanvasBackground);
   const updateObject = useTemplateStore((state) => state.updateObject);
@@ -172,7 +171,7 @@ export default function RightPanel({
     updateObject(id, { [tipo]: { ...selectedLayer[tipo], ...parcial } }, { historyKey });
   }
 
-  const cajaTexto = tipo === 'texto' ? obtenerCajaTexto(selectedLayer, textBoxes) : null;
+  const cajaTexto = tipo === 'texto' ? obtenerCajaTexto(selectedLayer) : null;
   const puntosLinea = tipo === 'linea' ? (selectedLayer.linea.points || [0, 0, 200, 0]) : null;
   const longitudLinea = puntosLinea
     ? Math.max(1, Math.round(Math.hypot(puntosLinea[2] - puntosLinea[0], puntosLinea[3] - puntosLinea[1])))
