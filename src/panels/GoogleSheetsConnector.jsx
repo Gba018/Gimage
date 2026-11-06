@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { obtenerClientId, iniciarSesionGoogle, obtenerTokenValido } from '../sheets/google-auth.js';
@@ -18,10 +18,15 @@ function traducirError(error) {
 
 export default function GoogleSheetsConnector({ locked = false }) {
   const sheets = useTemplateStore((state) => state.sheets);
+  const capas = useTemplateStore((state) => state.template.capas);
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
+  const updateObject = useTemplateStore((state) => state.updateObject);
   const clientId = obtenerClientId();
   const authMode = sheets.authMode ?? 'idle';
   const driveFiles = sheets.driveFiles ?? [];
+  const imagenes = capas.filter((capa) => capa.tipo === 'imagen');
+  const [imagenSeleccionada, setImagenSeleccionada] = useState('');
+  const [columnaImagen, setColumnaImagen] = useState('');
   const cargando = sheets.status === 'loading';
 
   async function conectar() {
@@ -86,6 +91,13 @@ export default function GoogleSheetsConnector({ locked = false }) {
     }
   }
 
+  function usarColumnaEnImagen() {
+    if (!imagenSeleccionada || !columnaImagen) return;
+    updateObject(imagenSeleccionada, {
+      imagen: { src: `{{${columnaImagen}}}` },
+    }, { historyKey: `sheets:${columnaImagen}:imagen` });
+  }
+
   return (
     <>
       {!clientId && (
@@ -96,13 +108,7 @@ export default function GoogleSheetsConnector({ locked = false }) {
         </div>
       )}
 
-      <button
-        type="button"
-        className="image-url-link"
-        data-testid="google-connect"
-        disabled={!clientId || cargando || locked}
-        onClick={conectar}
-      >
+      <button type="button" className="image-url-link" data-testid="google-connect" disabled={!clientId || cargando || locked} onClick={conectar}>
         <Icon name="link" size={14} />
         <span>{authMode === 'google' ? 'Recargar mis hojas de Drive' : 'Conectar con Google'}</span>
       </button>
@@ -110,56 +116,48 @@ export default function GoogleSheetsConnector({ locked = false }) {
       {authMode === 'google' && (
         <>
           <label className="prop-sub-label" htmlFor="drive-file">Hoja de cálculo</label>
-          <select
-            id="drive-file"
-            className="layer-rename-input"
-            data-testid="drive-file"
-            value={sheets.selectedDriveFileId ?? ''}
-            disabled={locked || cargando}
-            onChange={(event) => seleccionarArchivo(event.target.value)}
-          >
+          <select id="drive-file" className="layer-rename-input" data-testid="drive-file" value={sheets.selectedDriveFileId ?? ''} disabled={locked || cargando} onChange={(event) => seleccionarArchivo(event.target.value)}>
             <option value="">Elegí una hoja…</option>
-            {driveFiles.map((archivo) => (
-              <option key={archivo.id} value={archivo.id}>{archivo.name}</option>
-            ))}
+            {driveFiles.map((archivo) => (<option key={archivo.id} value={archivo.id}>{archivo.name}</option>))}
           </select>
 
           <div className="prop-grid-2">
             <div>
               <label className="prop-sub-label" htmlFor="sheets-tab">Pestaña</label>
-              <input
-                id="sheets-tab"
-                type="text"
-                className="layer-rename-input"
-                placeholder="Hoja 1"
-                value={sheets.sheetName}
-                disabled={locked}
-                onChange={(event) => setSheetsConfig({ sheetName: event.target.value })}
-              />
+              <input id="sheets-tab" type="text" className="layer-rename-input" placeholder="Hoja 1" value={sheets.sheetName} disabled={locked} onChange={(event) => setSheetsConfig({ sheetName: event.target.value })} />
             </div>
             <div>
               <label className="prop-sub-label" htmlFor="sheets-range">Rango</label>
-              <input
-                id="sheets-range"
-                type="text"
-                className="layer-rename-input"
-                value={sheets.range}
-                disabled={locked}
-                onChange={(event) => setSheetsConfig({ range: event.target.value })}
-              />
+              <input id="sheets-range" type="text" className="layer-rename-input" value={sheets.range} disabled={locked} onChange={(event) => setSheetsConfig({ range: event.target.value })} />
             </div>
           </div>
 
-          <button
-            type="button"
-            className="image-url-link"
-            disabled={!sheets.selectedDriveFileId || cargando || locked}
-            onClick={leerHoja}
-          >
+          <button type="button" className="image-url-link" disabled={!sheets.selectedDriveFileId || cargando || locked} onClick={leerHoja}>
             <Icon name="link" size={14} />
             <span>{cargando ? 'Conectando…' : 'Conectar y leer'}</span>
           </button>
         </>
+      )}
+
+      {sheets.status === 'ready' && imagenes.length > 0 && sheets.headers.length > 0 && (
+        <div className="rp-section prop-mt">
+          <span className="prop-sub-label">Imagen desde columna</span>
+          <p className="section-description">Elige una imagen del diseño y la columna que contiene sus enlaces. Gimage creará el campo dinámico automáticamente.</p>
+          <label className="prop-sub-label" htmlFor="imagen-dinamica">Imagen</label>
+          <select id="imagen-dinamica" className="layer-rename-input" value={imagenSeleccionada} disabled={locked} onChange={(event) => setImagenSeleccionada(event.target.value)}>
+            <option value="">Elegí una imagen…</option>
+            {imagenes.map((capa) => (<option key={capa.id} value={capa.id}>{capa.nombre}</option>))}
+          </select>
+          <label className="prop-sub-label" htmlFor="columna-imagen">Columna de enlaces</label>
+          <select id="columna-imagen" className="layer-rename-input" value={columnaImagen} disabled={locked} onChange={(event) => setColumnaImagen(event.target.value)}>
+            <option value="">Elegí una columna…</option>
+            {sheets.headers.map((header) => (<option key={header} value={header}>{header}</option>))}
+          </select>
+          <button type="button" className="image-url-link" disabled={!imagenSeleccionada || !columnaImagen || locked} onClick={usarColumnaEnImagen}>
+            <Icon name="image" size={14} />
+            <span>Usar columna en la imagen</span>
+          </button>
+        </div>
       )}
 
       {sheets.status === 'error' && (
