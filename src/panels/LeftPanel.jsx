@@ -152,6 +152,16 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   }, [sheets.status, sheets.rows.length, sheets.activeRowIndex, setActiveRowIndex]);
 
   useEffect(() => {
+    if (locked || sheets.status !== 'ready' || !sheets.headers.length || !nombresCampos.length) return;
+    sheets.headers.forEach((header) => {
+      if (sheets.columnToField[header]) return;
+      const columna = normalizarTexto(header);
+      const exacto = nombresCampos.find((nombre) => normalizarTexto(nombre) === columna);
+      if (exacto) mapColumnToField(header, exacto);
+    });
+  }, [locked, sheets.status, sheets.headers, sheets.columnToField, nombresCampos, mapColumnToField]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setBusquedaColumna(busquedaDraft), 180);
     return () => window.clearTimeout(timer);
   }, [busquedaDraft]);
