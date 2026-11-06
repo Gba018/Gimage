@@ -1,0 +1,44 @@
+/* Avisos flotantes: esquina inferior derecha, compactos y no invasivos. */
+.app-shell .toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  left: auto;
+  top: auto;
+  transform: none;
+  width: auto;
+  max-width: min(360px, calc(100vw - 40px));
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.app-shell .toast span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .toast button {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+.app-shell .toast button:hover,
+.app-shell .toast button:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .app-shell .toast {
+    right: 12px;
+    bottom: 12px;
+    max-width: calc(100vw - 24px);
+  }
+}

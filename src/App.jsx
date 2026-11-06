@@ -21,7 +21,7 @@ const PAUSA_ENTRE_RENDERES_MS = 50;
 const TOKEN_IMAGEN = /\{\{\s*([\w.-]+)\s*\}\}/;
 
 function leerArchivo(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsDataURL(file); }); }
-function leerArchivoTexto(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || '')); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsText(file); }); }
+function leerArchivoTexto(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsText(file); }); }
 function descargarBlob(blob, nombreArchivo) { const url = URL.createObjectURL(blob); const enlace = document.createElement('a'); enlace.href = url; enlace.download = nombreArchivo; document.body.appendChild(enlace); enlace.click(); enlace.remove(); URL.revokeObjectURL(url); }
 
 async function precargarImagenesDeFila(indice) {
@@ -187,7 +187,15 @@ export default function App() {
       {dialog === 'project' && <ProjectDialog onClose={closeDialog} />}
       {(dialog === 'image' || dialog === 'image-replace') && <ImageDialog onClose={closeDialog} onAdd={(url) => addOrReplaceImage(url, dialog === 'image-replace' ? replaceLayerIdRef.current : null)} />}
       {cropLayer && <CropDialog layer={cropLayer} onClose={() => setCropLayerId(null)} onApply={(nuevaImagen) => updateObject(cropLayer.id, { imagen:nuevaImagen })} />}
-      {notice && <div className={`toast toast-${notice.type}`} role="status"><Icon name="info" size={18} /><span>{notice.text}</span><button type="button" onClick={() => setNotice(null)} aria-label="Cerrar aviso"><Icon name="close" size={16} /></button></div>}
+      {notice && (
+        <div className={`toast toast-${notice.type}`} role="status" aria-live="polite">
+          <Icon name="info" size={18} />
+          <span>{notice.text}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Ocultar aviso" title="Ocultar aviso">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
