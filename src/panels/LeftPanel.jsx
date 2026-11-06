@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { normalizarNombreCampo } from '../template/fields.js';
-import { connectSheet, refreshSheet } from '../sheets/google-sheets.js';
 
 const OPCIONES_FUENTE = [
   { id: 'texto', label: 'Texto', icon: 'text' },
@@ -26,15 +25,18 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const setColumnField = useTemplateStore((state) => state.setColumnField);
   const setActiveRowIndex = useTemplateStore((state) => state.setActiveRowIndex);
   const setSheetStatus = useTemplateStore((state) => state.setSheetStatus);
+  const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
+  const connectSheet = useTemplateStore((state) => state.connectSheet);
+  const [sheetUrl, setSheetUrl] = useState(sheets.spreadsheetId || '');
   const campos = useMemo(() => Object.values(fields), [fields]);
   const campoSeleccionado = selectedIds.length === 1 ? template.capas.find((capa) => capa.id === selectedIds[0]) : null;
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
 
   useEffect(() => {
-    function actualizar() { refreshSheet(useTemplateStore.getState()).catch(() => setSheetStatus('error')); }
+    function actualizar() { connectSheet().catch(() => setSheetStatus('error')); }
     window.addEventListener('gimage:actualizar-sheets', actualizar);
     return () => window.removeEventListener('gimage:actualizar-sheets', actualizar);
-  }, [setSheetStatus]);
+  }, [connectSheet, setSheetStatus]);
 
   function agregarCampo(event) {
     event.preventDefault();
@@ -42,6 +44,11 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     if (!nombre || fields[nombre]) return;
     addField(nombre);
     setNuevoCampo('');
+  }
+
+  function conectarHoja() {
+    setSheetsConfig({ spreadsheetId: sheetUrl.trim() });
+    window.setTimeout(() => { connectSheet().catch(() => setSheetStatus('error')); }, 0);
   }
 
   return (
@@ -127,8 +134,8 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
           {sheets.status === 'disconnected' && (
             <div className="stack">
               <p>Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
-              <input id="sheet-url" placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
-              <button type="button" className="primary-action" onClick={() => connectSheet(document.getElementById('sheet-url').value, useTemplateStore.getState())}><Icon name="sheet" size={16} /><span>Conectar hoja</span></button>
+              <input value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
+              <button type="button" className="primary-action" onClick={conectarHoja}><Icon name="sheet" size={16} /><span>Conectar hoja</span></button>
             </div>
           )}
           {sheets.status === 'loading' && <p>Cargando hoja…</p>}
@@ -157,7 +164,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 </select>
               </label>
               <div className="stack">
-                <button type="button" className="secondary-action" onClick={onActualizarDatos}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
+                <button type="button" className="secondary-action" onClick={() => connectSheet().catch(() => setSheetStatus('error'))}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
                 <button type="button" className="primary-action" onClick={onGenerarLote} disabled={locked}><Icon name="download" size={16} /><span>Generar lote</span></button>
               </div>
             </div>
