@@ -104,7 +104,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const removeField = useTemplateStore((state) => state.removeField);
   const renameField = useTemplateStore((state) => state.renameField);
   const setFieldDefault = useTemplateStore((state) => state.setFieldDefault);
-  const setColumnField = useTemplateStore((state) => state.setColumnField);
+  const mapColumnToField = useTemplateStore((state) => state.mapColumnToField);
   const setActiveRowIndex = useTemplateStore((state) => state.setActiveRowIndex);
   const selectLayer = useTemplateStore((state) => state.selectLayer);
   const renameLayer = useTemplateStore((state) => state.renameLayer);
@@ -185,12 +185,12 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     sheets.headers.forEach((header) => {
       if (sheets.columnToField[header]) return;
       const coincidencia = buscarCoincidencia(header, nombresCampos);
-      if (coincidencia) setColumnField(header, coincidencia);
+      if (coincidencia) mapColumnToField(header, coincidencia);
     });
   }
 
   function limpiarMapeo() {
-    Object.keys(sheets.columnToField).forEach((header) => setColumnField(header, ''));
+    Object.keys(sheets.columnToField).forEach((header) => mapColumnToField(header, ''));
   }
 
   return (
@@ -283,7 +283,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                           <span className={`gp-status ${estado}`}>{etiqueta}</span>
                         </div>
                         {sugerido && <p className="gp-column-hint is-suggested">Coincidencia sugerida: [{sugerido}]</p>}
-                        <select className="gp-select" value={campo ?? ''} disabled={locked} onChange={(event) => setColumnField(header, event.target.value)} aria-label={`Campo para la columna ${header}`}>
+                        <select className="gp-select" value={campo ?? ''} disabled={locked} onChange={(event) => mapColumnToField(header, event.target.value)} aria-label={`Campo para la columna ${header}`}>
                           <option value="">Sin mapear</option>
                           {nombresCampos.map((nombre) => <option key={nombre} value={nombre}>{`[${nombre}]`}</option>)}
                         </select>
