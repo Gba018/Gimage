@@ -3,6 +3,7 @@ import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { esFillDegradado, fillACss } from '../template/schema.js';
 import { extraerCamposPlantilla } from '../template/fields.js';
+import { valoresDeFila } from '../sheets/mapper.js';
 import GoogleSheetsConnector from './GoogleSheetsConnector.jsx';
 
 function InsertCard({ icon, title, description, onClick, label, disabled }) {
@@ -144,6 +145,19 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     if (!busqueda) return sheets.headers;
     return sheets.headers.filter((header) => normalizarTexto(header).includes(busqueda));
   }, [busquedaColumna, sheets.headers]);
+  const filaActiva = sheets.activeRowIndex != null ? sheets.rows[sheets.activeRowIndex] : null;
+  const valoresFilaActiva = useMemo(() => (filaActiva ? valoresDeFila(filaActiva, sheets.headers, sheets.columnToField, fields) : {}), [filaActiva, sheets.headers, sheets.columnToField, fields]);
+  const campoImagenActivo = camposDetectados.find((campo) => campo.tipo === 'imagen' && valoresFilaActiva[campo.nombre]);
+  const miniaturaActiva = campoImagenActivo ? String(valoresFilaActiva[campoImagenActivo.nombre]) : '';
+  const nombreFilaActual = useMemo(() => {
+    if (sheets.activeRowIndex == null) return '';
+    const indice = sheets.activeRowIndex;
+    const fila = sheets.rows[indice];
+    if (!fila) return `Fila ${indice + 1}`;
+    const primerCampoTexto = camposDetectados.find((campo) => campo.tipo === 'texto');
+    const valor = primerCampoTexto ? (valoresDeFila(fila, sheets.headers, sheets.columnToField, fields)[primerCampoTexto.nombre] ?? '') : '';
+    return valor ? String(valor).slice(0, 32) : `Fila ${indice + 1}`;
+  }, [sheets.activeRowIndex, sheets.rows, sheets.headers, sheets.columnToField, fields, camposDetectados]);
 
   useEffect(() => {
     if (editingId && renameInputRef.current) {
@@ -276,19 +290,30 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
               {sheets.headers.length === 0 ? (
                 <div className="layers-empty"><Icon name="link" size={20} /><strong>Sin columnas</strong><p>La hoja no tiene encabezados en el rango indicado.</p></div>
               ) : (
-                <ul className="layers-list" aria-label="Mapeo de columnas a campos">
-                  {columnasFiltradas.map((header) => (
-                    <li key={header} className={`layer-row ${sheets.columnToField[header] ? 'is-selected' : ''}`} data-testid={`sheet-column-${header}`}>
-                      <div className="layer-title-cell"><span className="layer-name">{header}</span><small className="layer-pos-tag">{sheets.columnToField[header] ? `{{${sheets.columnToField[header]}}}` : 'Sin mapear'}</small></div>
-                      <div className="field-controls">
-                        <select className="layer-rename-input" aria-label={`Campo para la columna ${header}`} value={sheets.columnToField[header] ?? ''} disabled={locked} onChange={(event) => mapColumnToField(header, event.target.value || null)}>
-                          <option value="">Sin mapear</option>
-                          {camposDetectados.map((campo) => (<option key={campo.nombre} value={campo.nombre}>{`{{${campo.nombre}}}`}</option>))}
-                        </select>
+                <div className="sheets-table" role="table" aria-label="Mapeo de columnas a campos">
+                  <div className="sheets-table-head" role="row"><span role="columnheader">Columna</span><span role="columnheader">Estado</span></div>
+                  {columnasFiltradas.map((header) => {
+                    const campo = sheets.columnToField[header];
+                    const sugerido = !campo ? buscarCoincidencia(header, camposDetectados) : '';
+                    const estado = campo ? 'is-mapped' : (sugerido ? 'is-suggested' : 'is-empty');
+                    const etiqueta = campo ? 'Mapeada' : (sugerido ? 'Sugerida' : 'Sin mapear');
+                    return (
+                      <div key={header} className={`sheets-table-row ${estado}`} role="row" data-testid={`sheet-column-${header}`}>
+                        <div className="sheets-table-cell" role="cell">
+                          <span className="layer-name">{header}</span>
+                          <small className="layer-pos-tag">{campo ? `{{${campo}}}` : (sugerido ? `{{${sugerido}}}` : 'Sin mapear')}</small>
+                        </div>
+                        <div className="sheets-table-cell" role="cell">
+                          <span className={`mapping-status ${estado}`}>{etiqueta}</span>
+                          <select className="layer-rename-input" aria-label={`Campo para la columna ${header}`} value={campo ?? ''} disabled={locked} onChange={(event) => mapColumnToField(header, event.target.value || null)}>
+                            <option value="">Sin mapear</option>
+                            {camposDetectados.map((item) => (<option key={item.nombre} value={item.nombre}>{`{{${item.nombre}}}`}</option>))}
+                          </select>
+                        </div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                    );
+                  })}
+                </div>
               )}
 
               <div className="section-heading"><span>VISTA PREVIA</span><span>06</span></div>
@@ -297,6 +322,16 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 <option value="">Sin vista previa</option>
                 {sheets.rows.map((_, indice) => (<option key={indice} value={indice}>{`Fila ${indice + 1}`}</option>))}
               </select>
+              {filaActiva && (
+                <div className="sheets-preview-card" data-testid="sheets-preview-card">
+                  {miniaturaActiva && <img className="sheets-preview-thumb" src={miniaturaActiva} alt={`Miniatura de ${campoImagenActivo.nombre}`} />}
+                  <div className="sheets-preview-grid">
+                    {camposDetectados.map((campo) => (
+                      <div key={campo.nombre} className="sheets-preview-item"><strong>{`{{${campo.nombre}}}`}</strong><span>{String(valoresFilaActiva[campo.nombre] ?? '') || '—'}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="section-description">La fila seleccionada reemplaza temporalmente los campos en el lienzo; no cambia la plantilla.</p>
 
               <div className="section-heading"><span>RENDER MASIVO</span><span>09</span></div>
@@ -305,6 +340,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 <>
                   <div className="layers-order-hint"><span>{loteEstado.actual} de {loteEstado.total}</span><button type="button" className="layer-icon-btn is-danger" onClick={onCancelarLote} aria-label="Cancelar generación del lote" title="Cancelar"><Icon name="close" size={14} /></button></div>
                   <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,.12)', overflow: 'hidden' }} role="progressbar" aria-valuemin={0} aria-valuemax={loteEstado.total} aria-valuenow={loteEstado.actual}><div style={{ width: `${loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0}%`, height: '100%', background: '#7c5cff' }} /></div>
+                  <p className="lote-progress-info">{`Fila ${loteEstado.actual}/${loteEstado.total} · ${loteEstado.fallidos.length} con error · ${nombreFilaActual}`}</p>
                 </>
               )}
               {loteEstado.estado === 'listo' && (<div className="layers-empty" role="status"><Icon name="check" size={20} /><strong>Lote descargado</strong><p>{loteEstado.exitosos} imagen(es) generadas.{loteEstado.fallidos.length > 0 && ` Fallaron: fila ${loteEstado.fallidos.join(', fila ')}.`}</p></div>)}
