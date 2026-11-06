@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Group, Layer, Rect, Stage } from 'react-konva';
 import CanvasObject from './CanvasObject.jsx';
 import InlineTextEditor from './InlineTextEditor.jsx';
@@ -7,6 +7,7 @@ import { ManualGuides, SmartGuides, Ruler } from './Guides.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
 import { clamp, esFillOscuro, konvaFillProps } from '../template/schema.js';
+import { valoresDeFila } from '../sheets/mapper.js';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
@@ -38,6 +39,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const capas = useTemplateStore((state) => state.template.capas);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
   const revision = useTemplateStore((state) => state.projectRevision);
+  const fields = useTemplateStore((state) => state.fields);
+  const sheets = useTemplateStore((state) => state.sheets);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
   const updateObject = useTemplateStore((state) => state.updateObject);
   const updateObjects = useTemplateStore((state) => state.updateObjects);
@@ -64,6 +67,13 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const [editingTextId, setEditingTextId] = useState(null);
   canvasRef.current = canvas;
 
+  const fieldsPreview = useMemo(() => {
+    if (sheets.activeRowIndex == null) return null;
+    const fila = sheets.rows[sheets.activeRowIndex];
+    if (!fila) return null;
+    return valoresDeFila(fila, sheets.headers, sheets.columnToField, fields);
+  }, [fields, sheets.activeRowIndex, sheets.columnToField, sheets.headers, sheets.rows]);
+
   useEffect(() => {
     if (!editingTextId) return;
     const activa = capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && capa.visible && !capa.bloqueada);
@@ -80,14 +90,12 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     const { width, height } = sizeRef.current;
     const currentCanvas = canvasRef.current;
     if (!width || !height) return;
-    // DECISION: abrir cada proyecto ajustado a pantalla, con 48 px de margen cuando sea posible.
     const scale = clamp(
       Math.min(Math.max(1, width - 96) / currentCanvas.width, Math.max(1, height - 96) / currentCanvas.height),
       MIN_ZOOM,
       MAX_ZOOM,
     );
     changeView({ x: (width - currentCanvas.width * scale) / 2, y: (height - currentCanvas.height * scale) / 2, scale });
-    // DECISION: respetar el zoom mínimo y avisar si un lienzo grande no cabe completamente.
     if (currentCanvas.width * scale > width || currentCanvas.height * scale > height) onFitLimit();
   }, [changeView, onFitLimit]);
 
@@ -199,7 +207,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     function stop(pointerEvent) {
       const position = coordinates(pointerEvent);
       const currentCanvas = canvasRef.current;
-      // DECISION: las guías son temporales y solo se conservan al soltarlas dentro del lienzo.
       if (position.x >= 0 && position.x <= currentCanvas.width && position.y >= 0 && position.y <= currentCanvas.height) {
         addGuide(orientation, orientation === 'vertical' ? position.x : position.y);
       }
@@ -222,7 +229,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
 
   function dragStart(id, event) {
     event.cancelBubble = true;
-    // El Transformer de Konva inicia arrastres secundarios para la selección múltiple.
     if (dragRef.current?.ids.includes(id)) return;
     const state = useTemplateStore.getState();
     const candidatas = state.selectedIds.includes(id) ? state.selectedIds : [id];
@@ -353,8 +359,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
       let localY = (original.height - newHeight) / 2;
       if (anchor === 'middle-right') localX = 0;
       if (anchor === 'middle-left') localX = original.width - newWidth;
-      if (anchor === 'top-center') localY = original.height - newHeight;
-      if (anchor === 'bottom-center') localY = 0;
+      if (anchor === 'top-center') localY = 0;
+      if (anchor === 'bottom-center') localY = original.height - newHeight;
       const angle = (original.rotation * Math.PI) / 180;
       node.setAttrs({
         x: original.x + localX * Math.cos(angle) - localY * Math.sin(angle),
@@ -363,7 +369,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         scaleY: factor,
       });
     } else if (session.type === 'multiple' && session.bounds) {
-      // DECISION: redimensionar selecciones múltiples proporcionalmente evita introducir sesgos que el esquema no admite.
       const nodes = session.ids.map((id) => nodeRefs.current[id]).filter(Boolean);
       const current = limitesNodos(nodes, objectGroupRef.current);
       const initial = session.bounds;
@@ -373,8 +378,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
       let anchorY = initial.y + initial.height / 2;
       if (anchor === 'middle-left') anchorX = initial.x + initial.width;
       if (anchor === 'middle-right') anchorX = initial.x;
-      if (anchor === 'top-center') anchorY = initial.y + initial.height;
-      if (anchor === 'bottom-center') anchorY = initial.y;
+      if (anchor === 'top-center') anchorY = initial.y;
+      if (anchor === 'bottom-center') anchorY = initial.y + initial.height;
       session.ids.forEach((id) => {
         const node = nodeRefs.current[id];
         const original = session.positions[id];
@@ -541,6 +546,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                       onStartTextEdit={(layerId) => setEditingTextId(layerId)}
                       isEditing={editingTextId === capa.id}
                       panMode={spacePressed || panning}
+                      fieldsPreview={fieldsPreview}
                     />
                   ))}
                 </Group>

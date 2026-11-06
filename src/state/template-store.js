@@ -83,7 +83,7 @@ function filtrarSeleccionValida(capas, selectedIds) {
   return selectedIds.filter((id) => idsExistentes.has(id));
 }
 
-// La plantilla cumple 02-esquema-plantilla.md v3; la conexión y filas de Sheets son datos de sesión y no se serializan en el JSON.
+// La plantilla cumple 02-esquema-plantilla.md v3; Sheets es dato de sesión y no se serializa en el JSON.
 export const useTemplateStore = create((set, get) => {
   function aplicarCambio(mutador, opciones = {}) {
     set((state) => {
@@ -150,6 +150,7 @@ export const useTemplateStore = create((set, get) => {
       headers: [],
       rows: [],
       columnToField: {},
+      activeRowIndex: null,
       status: 'idle',
       error: '',
     },
@@ -570,7 +571,7 @@ export const useTemplateStore = create((set, get) => {
         return false;
       }
 
-      set({ sheets: { ...sheets, status: 'loading', error: '' } });
+      set({ sheets: { ...sheets, status: 'loading', error: '', activeRowIndex: null } });
       try {
         const datos = await leerHoja({
           apiKey: sheets.apiKey,
@@ -586,6 +587,7 @@ export const useTemplateStore = create((set, get) => {
             headers,
             rows,
             columnToField: {},
+            activeRowIndex: null,
             status: 'ready',
             error: '',
           },
@@ -610,12 +612,20 @@ export const useTemplateStore = create((set, get) => {
       return { sheets: { ...state.sheets, columnToField } };
     }),
 
+    setActiveRowIndex: (indice) => set((state) => {
+      const total = state.sheets.rows.length;
+      const siguiente = indice == null || indice < 0 || indice >= total ? null : indice;
+      if (state.sheets.activeRowIndex === siguiente) return {};
+      return { sheets: { ...state.sheets, activeRowIndex: siguiente } };
+    }),
+
     disconnectSheet: () => set((state) => ({
       sheets: {
         ...state.sheets,
         headers: [],
         rows: [],
         columnToField: {},
+        activeRowIndex: null,
         status: 'idle',
         error: '',
       },

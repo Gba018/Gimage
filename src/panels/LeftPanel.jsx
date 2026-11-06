@@ -138,6 +138,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
   const connectSheet = useTemplateStore((state) => state.connectSheet);
   const mapColumnToField = useTemplateStore((state) => state.mapColumnToField);
+  const setActiveRowIndex = useTemplateStore((state) => state.setActiveRowIndex);
   const disconnectSheet = useTemplateStore((state) => state.disconnectSheet);
 
   const [tab, setTab] = useState('objetos');
@@ -299,8 +300,8 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
 
       {tab === 'datos' && (
         <div className="sheets-panel" data-testid="sheets-panel">
-          <div className="section-heading"><span>GOOGLE SHEETS</span><span>05</span></div>
-          <p className="section-description">Conecta una hoja pública de solo lectura y mapea sus columnas a los campos.</p>
+          <div className="section-heading"><span>GOOGLE SHEETS</span><span>05 — 06</span></div>
+          <p className="section-description">Conecta una hoja pública de solo lectura, mapea columnas y previsualiza una fila.</p>
 
           <label className="prop-sub-label" htmlFor="sheets-api-key">API key</label>
           <input
@@ -402,6 +403,27 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                   ))}
                 </ul>
               )}
+
+              <div className="section-heading"><span>VISTA PREVIA</span><span>06</span></div>
+              <label className="prop-sub-label" htmlFor="sheets-preview-row">Fila activa</label>
+              <select
+                id="sheets-preview-row"
+                className="layer-rename-input"
+                data-testid="sheets-preview-row"
+                value={sheets.activeRowIndex ?? ''}
+                onChange={(event) => setActiveRowIndex(event.target.value === '' ? null : Number(event.target.value))}
+              >
+                <option value="">Sin vista previa</option>
+                {sheets.rows.map((_, indice) => (
+                  <option key={indice} value={indice}>
+                    {`Fila ${indice + 1}`}
+                  </option>
+                ))}
+              </select>
+              <p className="section-description">
+                La fila seleccionada reemplaza temporalmente los campos en el lienzo; no cambia la plantilla.
+              </p>
+
               <button type="button" className="image-url-link" onClick={disconnectSheet}>
                 <Icon name="close" size={14} />
                 <span>Desconectar hoja</span>

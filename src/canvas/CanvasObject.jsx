@@ -30,11 +30,13 @@ export default function CanvasObject({
   onStartTextEdit,
   isEditing = false,
   panMode,
+  fieldsPreview = null,
 }) {
   const selectObject = useTemplateStore((state) => state.selectObject);
   const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
   const fields = useTemplateStore((state) => state.fields);
   const isSelected = useTemplateStore((state) => state.selectedIds.includes(object.id));
+  const camposResolucion = fieldsPreview ?? fields;
 
   const textBox = useMemo(
     () => (object.tipo === 'texto' ? obtenerCajaTexto(object) : null),
@@ -50,10 +52,10 @@ export default function CanvasObject({
 
   const imagenDinamica = object.tipo === 'imagen' && esCampoImagen(object.imagen?.src);
   const imagenSrcResuelta = object.tipo === 'imagen'
-    ? resolverImagenSrc(object.imagen?.src, fields)
+    ? resolverImagenSrc(object.imagen?.src, camposResolucion)
     : '';
   const textoResuelto = object.tipo === 'texto'
-    ? resolverTexto(object.texto?.texto, fields)
+    ? resolverTexto(object.texto?.texto, camposResolucion)
     : '';
   const textoConCampos = object.tipo === 'texto'
     && /\{\{\s*([a-z0-9_-]+)\s*\}\}/.test(object.texto?.texto ?? '');
@@ -105,7 +107,6 @@ export default function CanvasObject({
 
   const setNode = useCallback((node) => {
     if (node && object.tipo === 'linea') {
-      // Garantiza una altura mínima de caja para que Konva.Transformer pueda escalar líneas horizontales a cualquier zoom.
       node.getSelfRect = () => {
         const pts = node.points();
         const xs = pts.filter((_, idx) => idx % 2 === 0);
@@ -124,7 +125,6 @@ export default function CanvasObject({
         };
       };
     } else if (node && object.tipo === 'texto') {
-      // Mantiene el bounding box del Group anclado a width × height de capa.texto.caja en los 3 modos de overflow.
       node.getClientRect = function getClientRectTexto(config = {}) {
         const caja = textBoxRef.current || DEFAULT_TEXT_BOX;
         const selfRect = {
@@ -136,7 +136,6 @@ export default function CanvasObject({
         if (config.skipTransform) {
           return selfRect;
         }
-        // _transformedRect aplica posición, rotación y escala actual (incluyendo durante el arrastre de Transformer)
         return this._transformedRect(selfRect, config.relativeTo);
       };
     }
