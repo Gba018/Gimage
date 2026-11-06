@@ -42,8 +42,8 @@ export default function GoogleSheetsConnector({ locked = false }) {
   const driveFiles = sheets.driveFiles ?? [];
   const cargando = sheets.status === 'loading';
 
-  async function cargarHoja({ token = '', spreadsheetId, sheetName, range }) {
-    setSheetsConfig({ status: 'loading', error: '', activeRowIndex: null });
+  async function cargarHoja({ token = '', spreadsheetId, sheetName, range, preservarMapeo = false }) {
+    setSheetsConfig({ status: 'loading', error: '', activeRowIndex: preservarMapeo ? useTemplateStore.getState().sheets.activeRowIndex : null });
     try {
       const tokenValido = token || await obtenerTokenValido();
       const datos = await leerHojaConToken({ accessToken: tokenValido, spreadsheetId, sheetName, range });
@@ -52,8 +52,8 @@ export default function GoogleSheetsConnector({ locked = false }) {
         accessToken: tokenValido,
         headers,
         rows,
-        columnToField: {},
-        activeRowIndex: null,
+        columnToField: preservarMapeo ? useTemplateStore.getState().sheets.columnToField : {},
+        activeRowIndex: preservarMapeo ? useTemplateStore.getState().sheets.activeRowIndex : null,
         status: 'ready',
         error: '',
       });
@@ -98,6 +98,15 @@ export default function GoogleSheetsConnector({ locked = false }) {
     }
     if (sheets.authMode === 'google' && !sheets.spreadsheetId) borrarConexion();
   }, [sheets.authMode, sheets.spreadsheetId, sheets.selectedDriveFileId, sheets.selectedDriveFileName, sheets.sheetName, sheets.range]);
+
+  useEffect(() => {
+    function actualizar() {
+      if (!sheets.spreadsheetId) return;
+      cargarHoja({ spreadsheetId: sheets.spreadsheetId, sheetName: sheets.sheetName, range: sheets.range, preservarMapeo: true });
+    }
+    window.addEventListener('gimage:actualizar-sheets', actualizar);
+    return () => window.removeEventListener('gimage:actualizar-sheets', actualizar);
+  }, [sheets.spreadsheetId, sheets.sheetName, sheets.range]);
 
   async function seleccionarArchivo(id) {
     const archivo = driveFiles.find((item) => item.id === id);

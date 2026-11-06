@@ -103,7 +103,7 @@ function FieldRow({ campo, valorDefecto, onCambiarValor, onRenombrar, onEliminar
   );
 }
 
-export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, loteEstado, locked = false }) {
+export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, onActualizarDatos, loteEstado, locked = false }) {
   const canvas = useTemplateStore((state) => state.template.canvas);
   const capas = useTemplateStore((state) => state.template.capas);
   const fields = useTemplateStore((state) => state.fields);
@@ -266,6 +266,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
 
           {sheets.status === 'ready' && (
             <>
+              <button type="button" className="image-url-link" onClick={onActualizarDatos} disabled={locked || sheets.status === 'loading'}><Icon name="link" size={14} /><span>Actualizar datos</span></button>
               <div className="section-heading"><span>COLUMNAS</span><span>{columnasMapeadas}/{sheets.headers.length} mapeadas</span></div>
               <input type="search" className="layer-rename-input" placeholder="Buscar columna…" value={busquedaColumna} onChange={(event) => setBusquedaColumna(event.target.value)} aria-label="Buscar columna" />
               <div className="layers-toolbar">
@@ -308,7 +309,9 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
               )}
               {loteEstado.estado === 'listo' && (<div className="layers-empty" role="status"><Icon name="check" size={20} /><strong>Lote descargado</strong><p>{loteEstado.exitosos} imagen(es) generadas.{loteEstado.fallidos.length > 0 && ` Fallaron: fila ${loteEstado.fallidos.join(', fila ')}.`}</p></div>)}
               {loteEstado.estado === 'error' && (<div className="layers-empty" role="alert"><Icon name="info" size={20} /><strong>No se pudo generar el lote</strong><p>{loteEstado.error}</p></div>)}
-
+              {!generando && loteEstado.fallidos.length > 0 && (
+                <button type="button" className="image-url-link" onClick={() => onReintentarLote(loteEstado.fallidos.map((fila) => fila - 1))}><Icon name="layers" size={14} /><span>{`Reintentar ${loteEstado.fallidos.length} fila(s)`}</span></button>
+              )}
               <button type="button" className="image-url-link" onClick={disconnectSheet} disabled={locked}><Icon name="close" size={14} /><span>Desconectar hoja</span></button>
             </>
           )}

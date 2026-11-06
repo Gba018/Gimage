@@ -24,6 +24,32 @@ function leerArchivo(file) { return new Promise((resolve, reject) => { const rea
 function leerArchivoTexto(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsText(file); }); }
 function descargarBlob(blob, nombreArchivo) { const url = URL.createObjectURL(blob); const enlace = document.createElement('a'); enlace.href = url; enlace.download = nombreArchivo; document.body.appendChild(enlace); enlace.click(); enlace.remove(); URL.revokeObjectURL(url); }
 
+function problemasDeFila(indice) {
+  const state = useTemplateStore.getState();
+  const { sheets: hoja, fields: campos, template } = state;
+  const fila = hoja.rows[indice];
+  if (!fila) return ['La fila no existe.'];
+  const valores = valoresDeFila(fila, hoja.headers, hoja.columnToField, campos);
+  const problemas = [];
+  template.capas.filter((capa) => capa.tipo === 'imagen').forEach((capa) => {
+    const coincidencia = TOKEN_IMAGEN.exec(capa.imagen.src || '');
+    if (!coincidencia) return;
+    const campo = coincidencia[1];
+    const valor = valores[campo] ?? campos[campo]?.defaultValue ?? '';
+    if (!valor) problemas.push(`Imagen “${campo}” sin URL.`);
+    else if (!/^(https?:\/\/|data:image\/)/i.test(valor)) problemas.push(`URL de imagen inválida para “${campo}”.`);
+  });
+  return problemas;
+}
+
+function traducirErrorRender(error) {
+  const mensaje = String(error?.message || error || '');
+  if (/Tainted canvases|CORS/i.test(mensaje)) return 'Una imagen externa no permite CORS y bloquea la exportación.';
+  if (/Failed to fetch|NetworkError|load failed/i.test(mensaje)) return 'No se pudo cargar una imagen. Revisa la URL o tu conexión.';
+  if (/No se pudo cargar la imagen/i.test(mensaje)) return 'No se pudo cargar una imagen. Revisa que la URL sea directa y accesible.';
+  return mensaje || 'Error desconocido al renderizar.';
+}
+
 async function precargarImagenesDeFila(indice) {
   const state = useTemplateStore.getState();
   const { sheets, fields, template } = state;
@@ -35,7 +61,7 @@ async function precargarImagenesDeFila(indice) {
     if (!coincidencia) return;
     const valor = valores[coincidencia[1]] ?? fields[coincidencia[1]]?.defaultValue ?? '';
     if (!valor) return;
-    try { await cargarImagen(valor); } catch { /* la fila fallará si no puede renderizarse */ }
+    try { await cargarImagen(valor); } catch { /* el error se reporta al renderizar */ }
   }));
 }
 
@@ -133,6 +159,8 @@ export default function App() {
     const { sheets: hoja, template: plantilla } = state;
     if (hoja.status !== 'ready' || !hoja.rows.length || !Object.keys(hoja.columnToField).length) { setLoteEstado({ estado:'error', actual:0, total:0, exitosos:0, fallidos:[], detalles:[], error:'Conecta una hoja y mapea al menos una columna antes de generar.' }); return; }
     if (!diagnostico.ok) { setLoteEstado({ estado:'error', actual:0, total:0, exitosos:0, fallidos:[], detalles:[], error:'Corrige los errores del diagnóstico antes de generar el lote.' }); return; }
+    const problemas = hoja.rows.map((_, indice) => ({ fila: indice + 1, motivo: problemasDeFila(indice).join(' ') })).filter((item) => item.motivo);
+    if (problemas.length) { setLoteEstado({ estado:'error', actual:0, total:hoja.rows.length, exitosos:0, fallidos:problemas.map((item) => item.fila), detalles:problemas, error:`Corrige ${problemas.length} fila(s) antes de generar.` }); return; }
     cancelarLoteRef.current = false;
     const total = hoja.rows.length;
     const filaActivaAnterior = hoja.activeRowIndex;
@@ -150,7 +178,7 @@ export default function App() {
         zip.file(`${base}-${String(indice + 1).padStart(3, '0')}.png`, dataUrl.split(',')[1], { base64:true });
         setLoteEstado((anterior) => ({ ...anterior, actual:indice + 1, exitosos:anterior.exitosos + 1 }));
       } catch (error) {
-        const motivo = String(error?.message || 'Error desconocido al renderizar.');
+        const motivo = traducirErrorRender(error);
         fallidos.push(indice + 1); detalles.push({ fila:indice + 1, motivo });
         setLoteEstado((anterior) => ({ ...anterior, actual:indice + 1, fallidos:[...anterior.fallidos, indice + 1], detalles:[...anterior.detalles, { fila:indice + 1, motivo }] }));
       }
@@ -163,7 +191,44 @@ export default function App() {
     }
     setLoteEstado({ estado:'error', actual:total, total, exitosos:0, fallidos, detalles, error:'Todas las filas fallaron; revisa las imágenes y permisos CORS.' });
   };
+  const reintentarLote = async (indices = []) => {
+    const state = useTemplateStore.getState();
+    const { sheets: hoja, template: plantilla } = state;
+    const filas = (Array.isArray(indices) ? indices : []).filter((indice) => Number.isInteger(indice) && indice >= 0 && indice < hoja.rows.length);
+    if (!filas.length) return;
+    cancelarLoteRef.current = false;
+    const total = filas.length;
+    const filaActivaAnterior = hoja.activeRowIndex;
+    const zip = new JSZip(); const fallidos = []; const detalles = [];
+    const base = String(plantilla.nombre || 'plantilla').trim().replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'plantilla';
+    setLoteEstado({ estado:'generando', actual:0, total, exitosos:0, fallidos:[], detalles:[], error:'' });
+    for (let paso = 0; paso < total; paso += 1) {
+      if (cancelarLoteRef.current) break;
+      const indice = filas[paso];
+      useTemplateStore.getState().setActiveRowIndex(indice);
+      await precargarImagenesDeFila(indice);
+      await new Promise((resolve) => window.setTimeout(resolve, PAUSA_ENTRE_RENDERES_MS));
+      try {
+        const dataUrl = await canvasRef.current?.renderizarPNG({ pixelRatio:2 });
+        if (!dataUrl) throw new Error('El lienzo no está disponible.');
+        zip.file(`${base}-${String(indice + 1).padStart(3, '0')}.png`, dataUrl.split(',')[1], { base64:true });
+        setLoteEstado((anterior) => ({ ...anterior, actual:paso + 1, exitosos:anterior.exitosos + 1 }));
+      } catch (error) {
+        const motivo = traducirErrorRender(error);
+        fallidos.push(indice + 1); detalles.push({ fila:indice + 1, motivo });
+        setLoteEstado((anterior) => ({ ...anterior, actual:paso + 1, fallidos:[...anterior.fallidos, indice + 1], detalles:[...anterior.detalles, { fila:indice + 1, motivo }] }));
+      }
+    }
+    useTemplateStore.getState().setActiveRowIndex(filaActivaAnterior);
+    if (cancelarLoteRef.current) { setLoteEstado({ estado:'idle', actual:0, total:0, exitosos:0, fallidos:[], detalles:[], error:'' }); setNotice({ type:'warning', text:'Reintento cancelado.' }); return; }
+    if (fallidos.length < total) {
+      try { const blob = await zip.generateAsync({ type:'blob' }); descargarBlob(blob, `${base}-reintento.zip`); setLoteEstado({ estado:'listo', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:'' }); return; }
+      catch (error) { setLoteEstado({ estado:'error', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:error.message || 'No se pudo crear el ZIP.' }); return; }
+    }
+    setLoteEstado({ estado:'error', actual:total, total, exitosos:0, fallidos, detalles, error:'Todas las filas reintentadas fallaron.' });
+  };
   const cancelarLote = () => { cancelarLoteRef.current = true; };
+  const actualizarDatos = () => window.dispatchEvent(new CustomEvent('gimage:actualizar-sheets'));
   const insertText = () => insertObject('texto');
   const insertRect = () => insertObject('rect');
   const insertCircle = () => insertObject('circulo');
@@ -177,7 +242,7 @@ export default function App() {
     <div className="app-shell">
       <TopBar zoom={zoom} disabled={generandoLote} diagnostico={diagnostico} onZoomIn={() => canvasRef.current?.zoomIn()} onZoomOut={() => canvasRef.current?.zoomOut()} onZoom100={() => canvasRef.current?.zoom100()} onFit={() => canvasRef.current?.fitToScreen()} onNewProject={() => setDialog('project')} onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onOpenTemplate={() => templateInputRef.current?.click()} onSaveTemplate={guardarArchivo} onExportPng={exportarPng} />
       <div className="editor-body">
-        <LeftPanel onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onImageUrl={() => { replaceLayerIdRef.current = null; setDialog('image'); }} onGenerarLote={generarLote} onCancelarLote={cancelarLote} loteEstado={loteEstado} locked={generandoLote} />
+        <LeftPanel onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onImageUrl={() => { replaceLayerIdRef.current = null; setDialog('image'); }} onGenerarLote={generarLote} onCancelarLote={cancelarLote} onReintentarLote={reintentarLote} onActualizarDatos={actualizarDatos} loteEstado={loteEstado} locked={generandoLote} />
         <CanvasStage ref={canvasRef} spacePressed={spacePressed} onZoomChange={setZoom} onFitLimit={notifyFitLimit} />
         <RightPanel onReplaceImageFile={replaceImageFile} onReplaceImageUrl={replaceImageUrl} onOpenCrop={(id) => setCropLayerId(id)} />
       </div>
