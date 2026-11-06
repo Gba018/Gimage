@@ -1,4 +1,4 @@
-const TOKEN = /\{\{\s*([\w.-]+)\s*\}\}/g;
+const TOKEN = /(?:\[\s*|\{\{\s*)([\w.-]+)(?:\s*\]|\s*\}\})/g;
 
 function extraerTokens(valor) {
   const texto = String(valor ?? '');
@@ -44,7 +44,7 @@ export function validarPlantilla({ template, fields = {}, sheets = null }) {
       else if (tokens.length) {
         const campo = tokens[0];
         const tieneDefecto = Boolean(String(fields[campo]?.defaultValue ?? '').trim());
-        if (!tieneDefecto && sheets?.status !== 'ready') advertencias.push({ tipo: 'imagen-sin-defecto', capaId: capa.id, mensaje: `La imagen “${capa.nombre}” usa {{${campo}}} pero no tiene valor por defecto para previsualizarla.` });
+        if (!tieneDefecto && sheets?.status !== 'ready') advertencias.push({ tipo: 'imagen-sin-defecto', capaId: capa.id, mensaje: `La imagen “${capa.nombre}” usa [${campo}] pero no tiene valor por defecto para previsualizarla.` });
       } else if (!esUrlImagenValida(src)) errores.push({ tipo: 'imagen-invalida', capaId: capa.id, mensaje: `La imagen “${capa.nombre}” tiene una URL inválida. Usa http(s) o un archivo local.` });
     }
     const caja = cajaAproximada(capa);
@@ -56,7 +56,7 @@ export function validarPlantilla({ template, fields = {}, sheets = null }) {
   if (sheets?.status === 'ready') {
     Object.entries(sheets.columnToField ?? {}).forEach(([columna, campo]) => {
       if (!campo) return;
-      if (!camposUsados.has(campo)) errores.push({ tipo: 'mapeo-invalido', mensaje: `La columna “${columna}” está mapeada a {{${campo}}}, pero ese campo no existe en la plantilla.` });
+      if (!camposUsados.has(campo)) errores.push({ tipo: 'mapeo-invalido', mensaje: `La columna “${columna}” está mapeada a [${campo}], pero ese campo no existe en la plantilla.` });
     });
     if (!Object.keys(sheets.columnToField ?? {}).length) advertencias.push({ tipo: 'sin-mapeo', mensaje: 'La hoja está conectada, pero todavía no mapeaste ninguna columna a un campo.' });
   }

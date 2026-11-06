@@ -18,7 +18,7 @@ import { valoresDeFila } from './sheets/mapper.js';
 const AUTOGUARDADO_MS = 800;
 const PAUSA_ENTRE_RENDERES_MS = 50;
 const TAMANO_TANDA = 8;
-const TOKEN_IMAGEN = /\{\{\s*([\w.-]+)\s*\}\}/;
+const TOKEN_IMAGEN = /(?:\[\s*|\{\{\s*)([\w.-]+)(?:\s*\]|\s*\}\})/;
 const IMAGEN_MARCADOR = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#e5e7eb"/><text x="50%" y="50%" fill="#6b7280" font-family="Arial" font-size="36" text-anchor="middle" dominant-baseline="middle">Imagen</text></svg>');
 
 function leerArchivo(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsDataURL(file); }); }

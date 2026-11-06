@@ -1,13 +1,19 @@
-export const FIELD_REGEX = /\{\{\s*([a-z0-9_-]+)\s*\}\}/g;
+export const FIELD_REGEX = /(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})/g;
 
 export function normalizarNombreCampo(valor) {
-  const limpio = String(valor ?? '').trim().replace(/^\{\{/, '').replace(/\}\}$/, '').trim().toLowerCase();
+  const limpio = String(valor ?? '').trim()
+    .replace(/^\[\s*/, '')
+    .replace(/\s*\]$/, '')
+    .replace(/^\{\{\s*/, '')
+    .replace(/\s*\}\}$/, '')
+    .trim()
+    .toLowerCase();
   return /^[a-z0-9_-]+$/.test(limpio) ? limpio : '';
 }
 
 export function extraerCamposDeTexto(texto) {
   const resultados = [];
-  const regex = /\{\{\s*([a-z0-9_-]+)\s*\}\}/g;
+  const regex = /(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})/g;
   let coincidencia;
   while ((coincidencia = regex.exec(String(texto ?? ''))) !== null) {
     resultados.push(coincidencia[1]);
@@ -41,30 +47,30 @@ function obtenerValorCampo(fields = {}, nombre) {
 }
 
 export function resolverTexto(texto, fields = {}) {
-  return String(texto ?? '').replace(/\{\{\s*([a-z0-9_-]+)\s*\}\}/g, (match, nombre) => {
+  return String(texto ?? '').replace(/(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})/g, (match, nombre) => {
     const valor = obtenerValorCampo(fields, nombre);
     return valor == null || valor === '' ? `[${nombre}]` : String(valor);
   });
 }
 
 export function resolverImagenSrc(src, fields = {}) {
-  const coincidencia = String(src ?? '').trim().match(/^\{\{\s*([a-z0-9_-]+)\s*\}\}$/);
+  const coincidencia = String(src ?? '').trim().match(/^(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})$/);
   if (!coincidencia) return String(src ?? '');
   const valor = obtenerValorCampo(fields, coincidencia[1]);
   return valor == null ? '' : String(valor);
 }
 
 export function esCampoImagen(src) {
-  return /^\{\{\s*([a-z0-9_-]+)\s*\}\}$/.test(String(src ?? '').trim());
+  return /^(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})$/.test(String(src ?? '').trim());
 }
 
 function nombreDesdeToken(src) {
-  const coincidencia = String(src ?? '').trim().match(/^\{\{\s*([a-z0-9_-]+)\s*\}\}$/);
+  const coincidencia = String(src ?? '').trim().match(/^(?:\[\s*|\{\{\s*)([a-z0-9_-]+)(?:\s*\]|\s*\}\})$/);
   return coincidencia ? coincidencia[1] : null;
 }
 
 function reemplazarToken(texto, nombre, reemplazo) {
-  return String(texto ?? '').replace(new RegExp(`\\{\\{\\s*${nombre}\\s*\\}\\}`, 'g'), reemplazo);
+  return String(texto ?? '').replace(new RegExp(`(?:\\[\\s*|\\{\\{\\s*)${nombre}(?:\\s*\\]|\\s*\\}\\})`, 'g'), reemplazo);
 }
 
 export function reemplazarCampoEnCapas(capas, nombre, { valorTexto = '', valorImagen = '' } = {}) {
@@ -82,10 +88,10 @@ export function reemplazarCampoEnCapas(capas, nombre, { valorTexto = '', valorIm
 export function renombrarCampoEnCapas(capas, nombreAnterior, nombreNuevo) {
   return (capas ?? []).map((capa) => {
     if (capa.tipo === 'texto') {
-      return { ...capa, texto: { ...capa.texto, texto: reemplazarToken(capa.texto?.texto, nombreAnterior, `{{${nombreNuevo}}}`) } };
+      return { ...capa, texto: { ...capa.texto, texto: reemplazarToken(capa.texto?.texto, nombreAnterior, `[${nombreNuevo}]`) } };
     }
     if (capa.tipo === 'imagen' && nombreDesdeToken(capa.imagen?.src) === nombreAnterior) {
-      return { ...capa, imagen: { ...capa.imagen, src: `{{${nombreNuevo}}}` } };
+      return { ...capa, imagen: { ...capa.imagen, src: `[${nombreNuevo}]` } };
     }
     return capa;
   });
