@@ -43,6 +43,11 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const fields = useTemplateStore((state) => state.fields);
   const sheets = useTemplateStore((state) => state.sheets);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
+  const setSelectedIds = useTemplateStore((state) => state.setSelectedIds);
+  const alignSelected = useTemplateStore((state) => state.alignSelected);
+  const distributeSelected = useTemplateStore((state) => state.distributeSelected);
+  const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
+  const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
   const updateObject = useTemplateStore((state) => state.updateObject);
   const updateObjects = useTemplateStore((state) => state.updateObjects);
   const addGuide = useTemplateStore((state) => state.addGuide);
@@ -68,6 +73,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const [smartGuides, setSmartGuides] = useState([]);
   const [editingTextId, setEditingTextId] = useState(null);
   const [exportando, setExportando] = useState(false);
+  const [marquee, setMarquee] = useState(null);
+  const marqueeRef = useRef(null);
   canvasRef.current = canvas;
 
   const fieldsPreview = useMemo(() => {
@@ -207,6 +214,14 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     if (node) nodeRefs.current[id] = node;
     else delete nodeRefs.current[id];
   }, []);
+
+  function pointerMundo(event) {
+    const stage = stageRef.current;
+    const punto = stage?.getPointerPosition();
+    if (!punto) return null;
+    const vista = viewRef.current;
+    return { x: (punto.x - vista.x) / vista.scale, y: (punto.y - vista.y) / vista.scale };
+  }
 
   function beginPan(event) {
     if (event.button !== 1 && !(event.button === 0 && spacePressed)) return;
@@ -522,6 +537,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     ? capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && capa.visible && !capa.bloqueada)
     : null;
   const editingBox = editingLayer ? obtenerCajaTexto(editingLayer) : null;
+  const capaUnica = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
 
   return (
     <main className="workspace" aria-label="Editor de lienzo">
@@ -557,7 +573,40 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
               scaleX={view.scale}
               scaleY={view.scale}
               onMouseDown={(event) => {
-                if (event.target === event.target.getStage() && !spacePressed) clearSelection();
+                if (event.target === event.target.getStage() && !spacePressed) {
+                  const punto = pointerMundo(event);
+                  if (punto) {
+                    marqueeRef.current = { x0: punto.x, y0: punto.y, x1: punto.x, y1: punto.y, additive: Boolean(event.evt?.shiftKey) };
+                    setMarquee(marqueeRef.current);
+                  }
+                }
+              }}
+              onMouseMove={(event) => {
+                if (!marqueeRef.current) return;
+                const punto = pointerMundo(event);
+                if (!punto) return;
+                marqueeRef.current = { ...marqueeRef.current, x1: punto.x, y1: punto.y };
+                setMarquee(marqueeRef.current);
+              }}
+              onMouseUp={() => {
+                const actual = marqueeRef.current;
+                marqueeRef.current = null;
+                setMarquee(null);
+                if (!actual) return;
+                const x = Math.min(actual.x0, actual.x1);
+                const y = Math.min(actual.y0, actual.y1);
+                const width = Math.abs(actual.x1 - actual.x0);
+                const height = Math.abs(actual.y1 - actual.y0);
+                const ids = capas.filter((capa) => capa.visible && !capa.bloqueada).filter((capa) => {
+                  const nodo = nodeRefs.current[capa.id];
+                  if (!nodo) return false;
+                  const caja = nodo.getClientRect({ relativeTo: objectGroupRef.current, skipShadow: true, skipStroke: true });
+                  return caja.x < x + width && caja.x + caja.width > x && caja.y < y + height && caja.y + caja.height > y;
+                }).map((capa) => capa.id);
+                const base = actual.additive ? selectedIds : [];
+                const union = Array.from(new Set([...base, ...ids]));
+                if (union.length) setSelectedIds(union);
+                else clearSelection();
               }}
               onTouchStart={(event) => {
                 if (event.target === event.target.getStage()) clearSelection();
@@ -581,7 +630,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
               </Layer>
               <Layer>
                 <Group ref={objectGroupRef}>
-                  {capas.map((capa) => (
+                  {capas.filter((capa) => capa.visible).map((capa) => (
                     <CanvasObject
                       key={capa.id}
                       object={capa}
@@ -613,7 +662,46 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
               <Layer listening={false} visible={!exportando}>
                 <SmartGuides canvas={canvas} zoom={view.scale} smartGuides={smartGuides} />
               </Layer>
+              <Layer listening={false} visible={!exportando && Boolean(marquee)}>
+                {marquee && (
+                  <Rect
+                    x={Math.min(marquee.x0, marquee.x1)}
+                    y={Math.min(marquee.y0, marquee.y1)}
+                    width={Math.abs(marquee.x1 - marquee.x0)}
+                    height={Math.abs(marquee.y1 - marquee.y0)}
+                    fill="rgba(59,130,246,0.12)"
+                    stroke="#3b82f6"
+                    strokeWidth={1 / view.scale}
+                    dash={[4 / view.scale, 4 / view.scale]}
+                  />
+                )}
+              </Layer>
             </Stage>
+          )}
+          {selectedIds.length > 0 && !exportando && !marquee && (
+            <div
+              className="context-toolbar"
+              style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 4, padding: 6, background: '#ffffff', borderRadius: 10, boxShadow: '0 6px 20px rgba(15,23,42,0.18)', zIndex: 5 }}
+            >
+              <button type="button" title="Alinear a la izquierda" onClick={() => alignSelected('left')}>⇤</button>
+              <button type="button" title="Centrar horizontalmente" onClick={() => alignSelected('center-h')}>↔</button>
+              <button type="button" title="Alinear a la derecha" onClick={() => alignSelected('right')}>⇥</button>
+              <button type="button" title="Alinear arriba" onClick={() => alignSelected('top')}>⇧</button>
+              <button type="button" title="Centrar verticalmente" onClick={() => alignSelected('middle')}>↕</button>
+              <button type="button" title="Alinear abajo" onClick={() => alignSelected('bottom')}>⇩</button>
+              {selectedIds.length >= 3 && (
+                <>
+                  <button type="button" title="Distribuir horizontalmente" onClick={() => distributeSelected('horizontal')}>⋯</button>
+                  <button type="button" title="Distribuir verticalmente" onClick={() => distributeSelected('vertical')}>⋮</button>
+                </>
+              )}
+              {capaUnica && (
+                <>
+                  <button type="button" title={capaUnica.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'} onClick={() => toggleLayerLocked(capaUnica.id)}>{capaUnica.bloqueada ? '🔓' : '🔒'}</button>
+                  <button type="button" title={capaUnica.visible ? 'Ocultar capa' : 'Mostrar capa'} onClick={() => toggleLayerVisible(capaUnica.id)}>{capaUnica.visible ? '👁' : '🚫'}</button>
+                </>
+              )}
+            </div>
           )}
           {editingLayer && editingBox && (
             <InlineTextEditor

@@ -16,7 +16,7 @@ function traducirErrorSheets(error) {
   if (/API key not valid|API_KEY_INVALID|invalid API key/i.test(mensaje)) return 'La API key no es válida o no tiene habilitada la Google Sheets API.';
   if (/PERMISSION_DENIED|403/i.test(mensaje)) return 'No se pudo leer la hoja: compártela como “Cualquier persona con el enlace puede ver”.';
   if (/Unable to parse range|400/i.test(mensaje)) return 'No se pudo leer el rango indicado. Revisa el nombre de la pestaña y el rango.';
-  if (/not found|404/i.test(mensaje)) return 'No se encontró la hoja. Revisa el ID o la URL.';
+  if (/not found|404/i.test(mensaje)) return 'No se encontró la hoja: revisa el ID o la URL.';
   return mensaje || 'No se pudo leer la hoja.';
 }
 export function obtenerCajaTexto(capa) { if (!capa || capa.tipo !== 'texto') return null; return normalizarCajaTexto(capa.texto?.caja, capa.texto); }
@@ -30,6 +30,15 @@ function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) {
 }
 function crearSnapshot(state) { return { template:clonar(state.template), selectedIds:[...state.selectedIds], fields:clonar(state.fields) }; }
 function filtrarSeleccionValida(capas, selectedIds) { const ids = new Set(capas.map((capa) => capa.id)); return selectedIds.filter((id) => ids.has(id)); }
+export function cajaCapa(capa) {
+  if (!capa) return { x:0, y:0, width:0, height:0 };
+  if (capa.tipo === 'texto') { const caja = obtenerCajaTexto(capa) ?? { width:0, height:0 }; return { x:capa.x, y:capa.y, width:caja.width, height:caja.height }; }
+  if (capa.tipo === 'rect') return { x:capa.x, y:capa.y, width:capa.rect?.width ?? 0, height:capa.rect?.height ?? 0 };
+  if (capa.tipo === 'imagen') return { x:capa.x, y:capa.y, width:capa.imagen?.width ?? 0, height:capa.imagen?.height ?? 0 };
+  if (capa.tipo === 'circulo') { const radio = capa.circulo?.radius ?? 0; return { x:capa.x, y:capa.y, width:radio * 2, height:radio * 2 }; }
+  if (capa.tipo === 'linea') { const puntos = capa.linea?.points ?? [0,0,0,0]; return { x:capa.x + Math.min(puntos[0], puntos[2]), y:capa.y + Math.min(puntos[1], puntos[3]), width:Math.abs(puntos[2] - puntos[0]), height:Math.abs(puntos[3] - puntos[1]) }; }
+  return { x:capa.x, y:capa.y, width:0, height:0 };
+}
 
 export const useTemplateStore = create((set, get) => {
   function aplicarCambio(mutador, opciones = {}) {
@@ -71,7 +80,53 @@ export const useTemplateStore = create((set, get) => {
     insertObject:(tipo, opciones) => { const capa = crearCapa(tipo, get().template, opciones); aplicarCambio((state) => ({ template:{ ...state.template, capas:[...state.template.capas, capa] }, selectedIds:[capa.id] })); return capa.id; },
     selectObject:(id, agregar = false) => set((state) => { const capa = state.template.capas.find((item) => item.id === id); if (!capa || capa.bloqueada || !capa.visible) return {}; if (agregar) return { selectedIds:state.selectedIds.includes(id) ? state.selectedIds.filter((actual) => actual !== id) : [...state.selectedIds, id] }; return state.selectedIds.includes(id) ? {} : { selectedIds:[id] }; }),
     selectLayer:(id, agregar = false) => set((state) => { const capa = state.template.capas.find((item) => item.id === id); if (!capa) return {}; if (agregar) return { selectedIds:state.selectedIds.includes(id) ? state.selectedIds.filter((actual) => actual !== id) : [...state.selectedIds, id] }; return state.selectedIds.length === 1 && state.selectedIds[0] === id ? {} : { selectedIds:[id] }; }),
+    setSelectedIds:(ids) => set((state) => { const validos = filtrarSeleccionValida(state.template.capas, Array.isArray(ids) ? ids : []); return JSON.stringify(validos) === JSON.stringify(state.selectedIds) ? {} : { selectedIds:validos }; }),
     clearSelection:() => set((state) => (state.selectedIds.length ? { selectedIds:[] } : {})),
+    alignSelected:(modo) => aplicarCambio((state) => {
+      const seleccion = state.template.capas.filter((capa) => state.selectedIds.includes(capa.id) && capa.visible && !capa.bloqueada);
+      if (!seleccion.length) return null;
+      const items = seleccion.map((capa) => ({ capa, caja:cajaCapa(capa) }));
+      const minX = Math.min(...items.map((item) => item.caja.x));
+      const maxX = Math.max(...items.map((item) => item.caja.x + item.caja.width));
+      const minY = Math.min(...items.map((item) => item.caja.y));
+      const maxY = Math.max(...items.map((item) => item.caja.y + item.caja.height));
+      const cambios = {};
+      items.forEach(({ capa, caja }) => {
+        let dx = 0; let dy = 0;
+        if (modo === 'left') dx = minX - caja.x;
+        if (modo === 'center-h') dx = (minX + maxX) / 2 - (caja.x + caja.width / 2);
+        if (modo === 'right') dx = maxX - (caja.x + caja.width);
+        if (modo === 'top') dy = minY - caja.y;
+        if (modo === 'middle') dy = (minY + maxY) / 2 - (caja.y + caja.height / 2);
+        if (modo === 'bottom') dy = maxY - (caja.y + caja.height);
+        if (!dx && !dy) return;
+        cambios[capa.id] = { x:Math.round(capa.x + dx), y:Math.round(capa.y + dy) };
+      });
+      if (!Object.keys(cambios).length) return null;
+      return { template:{ ...state.template, capas:state.template.capas.map((capa) => (cambios[capa.id] ? { ...capa, ...cambios[capa.id] } : capa)) } };
+    }),
+    distributeSelected:(eje) => aplicarCambio((state) => {
+      const seleccion = state.template.capas.filter((capa) => state.selectedIds.includes(capa.id) && capa.visible && !capa.bloqueada);
+      if (seleccion.length < 3) return null;
+      const items = seleccion.map((capa) => ({ capa, caja:cajaCapa(capa) }));
+      const horizontal = eje === 'horizontal';
+      items.sort((a, b) => (horizontal ? a.caja.x - b.caja.x : a.caja.y - b.caja.y));
+      const primero = items[0]; const ultimo = items[items.length - 1];
+      const inicio = horizontal ? primero.caja.x : primero.caja.y;
+      const fin = horizontal ? ultimo.caja.x + ultimo.caja.width : ultimo.caja.y + ultimo.caja.height;
+      const tamanoUltimo = horizontal ? ultimo.caja.width : ultimo.caja.height;
+      const paso = (fin - inicio - tamanoUltimo) / (items.length - 1);
+      const cambios = {};
+      items.forEach((item, indice) => {
+        const objetivo = inicio + indice * paso;
+        const actual = horizontal ? item.caja.x : item.caja.y;
+        const delta = Math.round(objetivo - actual);
+        if (!delta) return;
+        cambios[item.capa.id] = horizontal ? { x:Math.round(item.capa.x + delta) } : { y:Math.round(item.capa.y + delta) };
+      });
+      if (!Object.keys(cambios).length) return null;
+      return { template:{ ...state.template, capas:state.template.capas.map((capa) => (cambios[capa.id] ? { ...capa, ...cambios[capa.id] } : capa)) } };
+    }),
     updateObject:(id, cambios, opciones = {}) => aplicarCambio((state) => { let huboCambio = false; const capas = state.template.capas.map((capa) => { if (capa.id !== id) return capa; huboCambio = true; let actualizada = { ...capa, ...cambios }; if (capa.tipo && cambios[capa.tipo]) actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambios[capa.tipo] }; if (actualizada.tipo === 'texto') actualizada = normalizarCapaTextoConCaja(actualizada, cambios.texto?.caja || null, state.fields); return actualizada; }); if (!huboCambio) return null; const siguienteSeleccion = cambios.bloqueada === true ? state.selectedIds.filter((selId) => selId !== id) : state.selectedIds; return { template:{ ...state.template, capas }, selectedIds:siguienteSeleccion }; }, { historyKey:opciones.historyKey ?? null }),
     updateTextBox:(id, parcial, opciones = {}) => aplicarCambio((state) => { const existe = state.template.capas.some((capa) => capa.id === id && capa.tipo === 'texto'); if (!existe) return null; const capas = state.template.capas.map((capa) => (capa.id === id ? normalizarCapaTextoConCaja(capa, parcial, state.fields) : capa)); return { template:{ ...state.template, capas } }; }, { historyKey:opciones.historyKey ?? null }),
     reapplyAutoFitForFont:(familia, opciones = {}) => aplicarCambio((state) => { const objetivo = String(familia ?? '').trim().toLowerCase(); if (!objetivo) return null; let huboAjuste = false; const capas = state.template.capas.map((capa) => { if (capa.tipo !== 'texto' || String(capa.texto?.fontFamily ?? '').trim().toLowerCase() !== objetivo) return capa; const caja = obtenerCajaTexto(capa); if (!caja?.autoFit) return capa; const ajustada = normalizarCapaTextoConCaja(capa, null, state.fields); if (ajustada.texto.fontSize !== capa.texto.fontSize) huboAjuste = true; return ajustada.texto.fontSize !== capa.texto.fontSize ? ajustada : capa; }); return huboAjuste ? { template:{ ...state.template, capas } } : null; }, { historyKey:opciones.historyKey ?? null }),
