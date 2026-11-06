@@ -18,6 +18,7 @@ import { valoresDeFila } from './sheets/mapper.js';
 const AUTOGUARDADO_MS = 800;
 const PAUSA_ENTRE_RENDERES_MS = 50;
 const TOKEN_IMAGEN = /\{\{\s*([\w.-]+)\s*\}\}/;
+const IMAGEN_MARCADOR = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#e5e7eb"/><text x="50%" y="50%" fill="#6b7280" font-family="Arial" font-size="36" text-anchor="middle" dominant-baseline="middle">Imagen</text></svg>');
 
 function leerArchivo(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsDataURL(file); }); }
 function leerArchivoTexto(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsText(file); }); }
@@ -167,7 +168,7 @@ export default function App() {
   const insertRect = () => insertObject('rect');
   const insertCircle = () => insertObject('circulo');
   const insertLine = () => insertObject('linea');
-  const insertImage = () => { replaceLayerIdRef.current = null; fileInputRef.current?.click(); };
+  const insertImage = () => insertObject('imagen', { src: IMAGEN_MARCADOR, naturalWidth: 800, naturalHeight: 600 });
   const replaceImageFile = (layerId) => { replaceLayerIdRef.current = layerId; fileInputRef.current?.click(); };
   const replaceImageUrl = (layerId) => { replaceLayerIdRef.current = layerId; setDialog('image-replace'); };
   const cropLayer = cropLayerId ? capas.find((capa) => capa.id === cropLayerId && capa.tipo === 'imagen') : null;
