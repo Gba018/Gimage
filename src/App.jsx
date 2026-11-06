@@ -17,12 +17,14 @@ import { valoresDeFila } from './sheets/mapper.js';
 
 const AUTOGUARDADO_MS = 800;
 const PAUSA_ENTRE_RENDERES_MS = 50;
+const TAMANO_TANDA = 8;
 const TOKEN_IMAGEN = /\{\{\s*([\w.-]+)\s*\}\}/;
 const IMAGEN_MARCADOR = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#e5e7eb"/><text x="50%" y="50%" fill="#6b7280" font-family="Arial" font-size="36" text-anchor="middle" dominant-baseline="middle">Imagen</text></svg>');
 
 function leerArchivo(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsDataURL(file); }); }
 function leerArchivoTexto(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.')); reader.readAsText(file); }); }
 function descargarBlob(blob, nombreArchivo) { const url = URL.createObjectURL(blob); const enlace = document.createElement('a'); enlace.href = url; enlace.download = nombreArchivo; document.body.appendChild(enlace); enlace.click(); enlace.remove(); URL.revokeObjectURL(url); }
+function cederAlNavegador() { return new Promise((resolve) => window.setTimeout(resolve, 0)); }
 
 function problemasDeFila(indice) {
   const state = useTemplateStore.getState();
@@ -171,6 +173,7 @@ export default function App() {
       if (cancelarLoteRef.current) break;
       useTemplateStore.getState().setActiveRowIndex(indice);
       await precargarImagenesDeFila(indice);
+      if (indice + 1 < total) precargarImagenesDeFila(indice + 1).catch(() => {});
       await new Promise((resolve) => window.setTimeout(resolve, PAUSA_ENTRE_RENDERES_MS));
       try {
         const dataUrl = await canvasRef.current?.renderizarPNG({ pixelRatio:2 });
@@ -182,11 +185,12 @@ export default function App() {
         fallidos.push(indice + 1); detalles.push({ fila:indice + 1, motivo });
         setLoteEstado((anterior) => ({ ...anterior, actual:indice + 1, fallidos:[...anterior.fallidos, indice + 1], detalles:[...anterior.detalles, { fila:indice + 1, motivo }] }));
       }
+      if ((indice + 1) % TAMANO_TANDA === 0 && indice + 1 < total) await cederAlNavegador();
     }
     useTemplateStore.getState().setActiveRowIndex(filaActivaAnterior);
     if (cancelarLoteRef.current) { setLoteEstado({ estado:'idle', actual:0, total:0, exitosos:0, fallidos:[], detalles:[], error:'' }); setNotice({ type:'warning', text:'Generación del lote cancelada.' }); return; }
     if (fallidos.length < total) {
-      try { const blob = await zip.generateAsync({ type:'blob' }); descargarBlob(blob, `${base}-lote.zip`); setLoteEstado({ estado:'listo', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:'' }); return; }
+      try { const blob = await zip.generateAsync({ type:'blob', compression:'STORE' }); descargarBlob(blob, `${base}-lote.zip`); setLoteEstado({ estado:'listo', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:'' }); return; }
       catch (error) { setLoteEstado({ estado:'error', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:error.message || 'No se pudo crear el ZIP.' }); return; }
     }
     setLoteEstado({ estado:'error', actual:total, total, exitosos:0, fallidos, detalles, error:'Todas las filas fallaron; revisa las imágenes y permisos CORS.' });
@@ -207,6 +211,8 @@ export default function App() {
       const indice = filas[paso];
       useTemplateStore.getState().setActiveRowIndex(indice);
       await precargarImagenesDeFila(indice);
+      const siguiente = filas[paso + 1];
+      if (siguiente != null) precargarImagenesDeFila(siguiente).catch(() => {});
       await new Promise((resolve) => window.setTimeout(resolve, PAUSA_ENTRE_RENDERES_MS));
       try {
         const dataUrl = await canvasRef.current?.renderizarPNG({ pixelRatio:2 });
@@ -218,11 +224,12 @@ export default function App() {
         fallidos.push(indice + 1); detalles.push({ fila:indice + 1, motivo });
         setLoteEstado((anterior) => ({ ...anterior, actual:paso + 1, fallidos:[...anterior.fallidos, indice + 1], detalles:[...anterior.detalles, { fila:indice + 1, motivo }] }));
       }
+      if ((paso + 1) % TAMANO_TANDA === 0 && paso + 1 < total) await cederAlNavegador();
     }
     useTemplateStore.getState().setActiveRowIndex(filaActivaAnterior);
     if (cancelarLoteRef.current) { setLoteEstado({ estado:'idle', actual:0, total:0, exitosos:0, fallidos:[], detalles:[], error:'' }); setNotice({ type:'warning', text:'Reintento cancelado.' }); return; }
     if (fallidos.length < total) {
-      try { const blob = await zip.generateAsync({ type:'blob' }); descargarBlob(blob, `${base}-reintento.zip`); setLoteEstado({ estado:'listo', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:'' }); return; }
+      try { const blob = await zip.generateAsync({ type:'blob', compression:'STORE' }); descargarBlob(blob, `${base}-reintento.zip`); setLoteEstado({ estado:'listo', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:'' }); return; }
       catch (error) { setLoteEstado({ estado:'error', actual:total, total, exitosos:total - fallidos.length, fallidos, detalles, error:error.message || 'No se pudo crear el ZIP.' }); return; }
     }
     setLoteEstado({ estado:'error', actual:total, total, exitosos:0, fallidos, detalles, error:'Todas las filas reintentadas fallaron.' });

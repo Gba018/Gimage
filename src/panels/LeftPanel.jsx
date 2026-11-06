@@ -41,14 +41,20 @@ function claveMapeo(spreadsheetId, sheetName) {
 function cargarMapeo(spreadsheetId, sheetName) {
   try {
     const crudo = localStorage.getItem(claveMapeo(spreadsheetId, sheetName));
-    return crudo ? JSON.parse(crudo) : {};
+    const datos = crudo ? JSON.parse(crudo) : null;
+    return datos?.columnToField ?? {};
   } catch {
     return {};
   }
 }
 
 function guardarMapeo(spreadsheetId, sheetName, mapeo) {
-  try { localStorage.setItem(claveMapeo(spreadsheetId, sheetName), JSON.stringify(mapeo)); } catch { /* almacenamiento no disponible */ }
+  try {
+    localStorage.setItem(claveMapeo(spreadsheetId, sheetName), JSON.stringify({
+      version: 1,
+      columnToField: mapeo,
+    }));
+  } catch { /* almacenamiento no disponible */ }
 }
 
 function buscarCoincidencia(header, campos) {
@@ -132,6 +138,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const [editingName, setEditingName] = useState('');
   const [dragIndex, setDragIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
+  const [busquedaDraft, setBusquedaDraft] = useState('');
   const [busquedaColumna, setBusquedaColumna] = useState('');
   const renameInputRef = useRef(null);
 
@@ -165,6 +172,11 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       renameInputRef.current.select();
     }
   }, [editingId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBusquedaColumna(busquedaDraft), 180);
+    return () => window.clearTimeout(timer);
+  }, [busquedaDraft]);
 
   useEffect(() => {
     if (sheets.status !== 'ready' || !sheets.spreadsheetId || !sheets.sheetName || !sheets.headers.length) return;
@@ -282,7 +294,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
             <>
               <button type="button" className="image-url-link" onClick={onActualizarDatos} disabled={locked || sheets.status === 'loading'}><Icon name="link" size={14} /><span>Actualizar datos</span></button>
               <div className="section-heading"><span>COLUMNAS</span><span>{columnasMapeadas}/{sheets.headers.length} mapeadas</span></div>
-              <input type="search" className="layer-rename-input" placeholder="Buscar columna…" value={busquedaColumna} onChange={(event) => setBusquedaColumna(event.target.value)} aria-label="Buscar columna" />
+              <input type="search" className="layer-rename-input" placeholder="Buscar columna…" value={busquedaDraft} onChange={(event) => setBusquedaDraft(event.target.value)} aria-label="Buscar columna" />
               <div className="layers-toolbar">
                 <button type="button" className="layer-tool-btn" onClick={autoMapear} disabled={locked || !camposDetectados.length} title="Buscar coincidencias automáticas"><Icon name="sparkle" size={14} /></button>
                 <button type="button" className="layer-tool-btn is-danger" onClick={limpiarMapeo} disabled={locked || !columnasMapeadas} title="Limpiar mapeo"><Icon name="close" size={14} /></button>
