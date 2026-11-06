@@ -6,7 +6,6 @@ import CropDialog from './components/CropDialog.jsx';
 import ImageDialog from './components/ImageDialog.jsx';
 import ProjectDialog from './components/ProjectDialog.jsx';
 import { Icon } from './components/Icons.jsx';
-import DiagnosticsPanel from './panels/DiagnosticsPanel.jsx';
 import LeftPanel from './panels/LeftPanel.jsx';
 import RightPanel from './panels/RightPanel.jsx';
 import TopBar from './panels/TopBar.jsx';
@@ -175,13 +174,12 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <TopBar zoom={zoom} disabled={generandoLote} onZoomIn={() => canvasRef.current?.zoomIn()} onZoomOut={() => canvasRef.current?.zoomOut()} onZoom100={() => canvasRef.current?.zoom100()} onFit={() => canvasRef.current?.fitToScreen()} onNewProject={() => setDialog('project')} onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onOpenTemplate={() => templateInputRef.current?.click()} onSaveTemplate={guardarArchivo} onExportPng={exportarPng} />
+      <TopBar zoom={zoom} disabled={generandoLote} diagnostico={diagnostico} onZoomIn={() => canvasRef.current?.zoomIn()} onZoomOut={() => canvasRef.current?.zoomOut()} onZoom100={() => canvasRef.current?.zoom100()} onFit={() => canvasRef.current?.fitToScreen()} onNewProject={() => setDialog('project')} onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onOpenTemplate={() => templateInputRef.current?.click()} onSaveTemplate={guardarArchivo} onExportPng={exportarPng} />
       <div className="editor-body">
         <LeftPanel onInsertText={insertText} onInsertRect={insertRect} onInsertCircle={insertCircle} onInsertLine={insertLine} onInsertImage={insertImage} onImageUrl={() => { replaceLayerIdRef.current = null; setDialog('image'); }} onGenerarLote={generarLote} onCancelarLote={cancelarLote} loteEstado={loteEstado} locked={generandoLote} />
         <CanvasStage ref={canvasRef} spacePressed={spacePressed} onZoomChange={setZoom} onFitLimit={notifyFitLimit} />
         <RightPanel onReplaceImageFile={replaceImageFile} onReplaceImageUrl={replaceImageUrl} onOpenCrop={(id) => setCropLayerId(id)} />
       </div>
-      <DiagnosticsPanel diagnostico={diagnostico} generando={generandoLote} />
       <input ref={fileInputRef} type="file" accept="image/*" onChange={fileChanged} className="visually-hidden" aria-label="Seleccionar archivo de imagen" />
       <input ref={templateInputRef} type="file" accept="application/json,.json" onChange={templateFileChanged} className="visually-hidden" aria-label="Abrir archivo de plantilla JSON" />
       {dialog === 'project' && <ProjectDialog onClose={closeDialog} />}
@@ -191,9 +189,7 @@ export default function App() {
         <div className={`toast toast-${notice.type}`} role="status" aria-live="polite">
           <Icon name="info" size={18} />
           <span>{notice.text}</span>
-          <button type="button" onClick={() => setNotice(null)} aria-label="Ocultar aviso" title="Ocultar aviso">
-            <Icon name="close" size={16} />
-          </button>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Ocultar aviso" title="Ocultar aviso"><Icon name="close" size={16} /></button>
         </div>
       )}
     </div>
