@@ -25,6 +25,43 @@ function muestraCapaCss(capa) {
   return null;
 }
 
+function normalizarTexto(valor) {
+  return String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function claveMapeo(spreadsheetId, sheetName) {
+  return `gimage:sheets:mapeo:${normalizarTexto(spreadsheetId)}:${normalizarTexto(sheetName)}`;
+}
+
+function cargarMapeo(spreadsheetId, sheetName) {
+  try {
+    const crudo = localStorage.getItem(claveMapeo(spreadsheetId, sheetName));
+    return crudo ? JSON.parse(crudo) : {};
+  } catch {
+    return {};
+  }
+}
+
+function guardarMapeo(spreadsheetId, sheetName, mapeo) {
+  try { localStorage.setItem(claveMapeo(spreadsheetId, sheetName), JSON.stringify(mapeo)); } catch { /* almacenamiento no disponible */ }
+}
+
+function buscarCoincidencia(header, campos) {
+  const columna = normalizarTexto(header);
+  if (!columna) return '';
+  const exacta = campos.find((campo) => normalizarTexto(campo.nombre) === columna);
+  if (exacta) return exacta.nombre;
+  const parcial = campos.find((campo) => {
+    const nombre = normalizarTexto(campo.nombre);
+    return nombre && (columna.includes(nombre) || nombre.includes(columna));
+  });
+  return parcial?.nombre ?? '';
+}
+
 function FieldRow({ campo, valorDefecto, onCambiarValor, onRenombrar, onEliminar, onAplicarAImagen, onInsertarEnTexto, puedeAplicarAImagen, puedeInsertarEnTexto }) {
   const [editando, setEditando] = useState(false);
   const [nombreDraft, setNombreDraft] = useState(campo.nombre);
@@ -94,6 +131,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const [editingName, setEditingName] = useState('');
   const [dragIndex, setDragIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
+  const [busquedaColumna, setBusquedaColumna] = useState('');
   const renameInputRef = useRef(null);
 
   const camposDetectados = useMemo(() => extraerCamposPlantilla({ capas }), [capas]);
@@ -101,6 +139,11 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const columnasMapeadas = Object.keys(sheets.columnToField).length;
   const puedeGenerarLote = sheets.status === 'ready' && sheets.rows.length > 0 && columnasMapeadas > 0;
   const generando = loteEstado.estado === 'generando';
+  const columnasFiltradas = useMemo(() => {
+    const busqueda = normalizarTexto(busquedaColumna);
+    if (!busqueda) return sheets.headers;
+    return sheets.headers.filter((header) => normalizarTexto(header).includes(busqueda));
+  }, [busquedaColumna, sheets.headers]);
 
   useEffect(() => {
     if (editingId && renameInputRef.current) {
@@ -108,6 +151,31 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       renameInputRef.current.select();
     }
   }, [editingId]);
+
+  useEffect(() => {
+    if (sheets.status !== 'ready' || !sheets.spreadsheetId || !sheets.sheetName || !sheets.headers.length) return;
+    const guardado = cargarMapeo(sheets.spreadsheetId, sheets.sheetName);
+    const mapeoRestaurado = {};
+    sheets.headers.forEach((header) => {
+      const campo = guardado[header];
+      if (campo && camposDetectados.some((item) => item.nombre === campo)) mapeoRestaurado[header] = campo;
+    });
+    if (Object.keys(mapeoRestaurado).length) {
+      Object.entries(mapeoRestaurado).forEach(([header, campo]) => mapColumnToField(header, campo));
+      return;
+    }
+    sheets.headers.forEach((header) => {
+      if (sheets.columnToField[header]) return;
+      const coincidencia = buscarCoincidencia(header, camposDetectados);
+      if (coincidencia) mapColumnToField(header, coincidencia);
+    });
+  }, [sheets.status, sheets.spreadsheetId, sheets.sheetName, sheets.headers, sheets.columnToField, camposDetectados, mapColumnToField]);
+
+  useEffect(() => {
+    if (sheets.status === 'ready' && sheets.spreadsheetId && sheets.sheetName) {
+      guardarMapeo(sheets.spreadsheetId, sheets.sheetName, sheets.columnToField);
+    }
+  }, [sheets.status, sheets.spreadsheetId, sheets.sheetName, sheets.columnToField]);
 
   function iniciarRenombrado(capa) {
     setEditingId(capa.id);
@@ -120,6 +188,18 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       if (limpio) renameLayer(editingId, limpio);
     }
     setEditingId(null);
+  }
+
+  function autoMapear() {
+    sheets.headers.forEach((header) => {
+      if (sheets.columnToField[header]) return;
+      const coincidencia = buscarCoincidencia(header, camposDetectados);
+      if (coincidencia) mapColumnToField(header, coincidencia);
+    });
+  }
+
+  function limpiarMapeo() {
+    Object.keys(sheets.columnToField).forEach((header) => mapColumnToField(header, null));
   }
 
   const haySeleccion = selectedIds.length > 0;
@@ -186,14 +266,19 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
 
           {sheets.status === 'ready' && (
             <>
-              <div className="section-heading"><span>COLUMNAS</span><span>{sheets.rows.length} filas</span></div>
+              <div className="section-heading"><span>COLUMNAS</span><span>{columnasMapeadas}/{sheets.headers.length} mapeadas</span></div>
+              <input type="search" className="layer-rename-input" placeholder="Buscar columna…" value={busquedaColumna} onChange={(event) => setBusquedaColumna(event.target.value)} aria-label="Buscar columna" />
+              <div className="layers-toolbar">
+                <button type="button" className="layer-tool-btn" onClick={autoMapear} disabled={locked || !camposDetectados.length} title="Buscar coincidencias automáticas"><Icon name="sparkle" size={14} /></button>
+                <button type="button" className="layer-tool-btn is-danger" onClick={limpiarMapeo} disabled={locked || !columnasMapeadas} title="Limpiar mapeo"><Icon name="close" size={14} /></button>
+              </div>
               {sheets.headers.length === 0 ? (
                 <div className="layers-empty"><Icon name="link" size={20} /><strong>Sin columnas</strong><p>La hoja no tiene encabezados en el rango indicado.</p></div>
               ) : (
                 <ul className="layers-list" aria-label="Mapeo de columnas a campos">
-                  {sheets.headers.map((header) => (
-                    <li key={header} className="layer-row" data-testid={`sheet-column-${header}`}>
-                      <div className="layer-title-cell"><span className="layer-name">{header}</span></div>
+                  {columnasFiltradas.map((header) => (
+                    <li key={header} className={`layer-row ${sheets.columnToField[header] ? 'is-selected' : ''}`} data-testid={`sheet-column-${header}`}>
+                      <div className="layer-title-cell"><span className="layer-name">{header}</span><small className="layer-pos-tag">{sheets.columnToField[header] ? `{{${sheets.columnToField[header]}}}` : 'Sin mapear'}</small></div>
                       <div className="field-controls">
                         <select className="layer-rename-input" aria-label={`Campo para la columna ${header}`} value={sheets.columnToField[header] ?? ''} disabled={locked} onChange={(event) => mapColumnToField(header, event.target.value || null)}>
                           <option value="">Sin mapear</option>
