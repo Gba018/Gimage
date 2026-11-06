@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { normalizarNombreCampo } from '../template/fields.js';
+import GoogleSheetsConnector from './GoogleSheetsConnector.jsx';
 
 const PESTANAS = [
   { id: 'elementos', label: 'Elementos', icon: 'shapes' },
@@ -51,7 +52,7 @@ const ESTILOS = `
 .gp-shape:hover:not(:disabled){background:#1e293b;}
 `;
 
-export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, loteEstado, locked }) {
+export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, onActualizarDatos, loteEstado, locked }) {
   const [pestana, setPestana] = useState('elementos');
   const [nuevoCampo, setNuevoCampo] = useState('');
   const template = useTemplateStore((state) => state.template);
@@ -69,20 +70,10 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
   const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
   const reorderLayer = useTemplateStore((state) => state.reorderLayer);
-  const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
-  const connectSheet = useTemplateStore((state) => state.connectSheet);
-  const [sheetUrl, setSheetUrl] = useState(sheets.spreadsheetId || '');
   const campos = useMemo(() => Object.values(fields), [fields]);
   const capas = template.capas;
   const campoSeleccionado = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
-  const sinConexion = sheets.status === 'idle' || sheets.status === 'disconnected';
-
-  useEffect(() => {
-    function actualizar() { connectSheet().catch(() => {}); }
-    window.addEventListener('gimage:actualizar-sheets', actualizar);
-    return () => window.removeEventListener('gimage:actualizar-sheets', actualizar);
-  }, [connectSheet]);
 
   function agregarCampo(event) {
     event.preventDefault();
@@ -90,11 +81,6 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     if (!nombre || fields[nombre]) return;
     addField(nombre);
     setNuevoCampo('');
-  }
-
-  function conectarHoja() {
-    setSheetsConfig({ spreadsheetId: sheetUrl.trim() });
-    window.setTimeout(() => { connectSheet().catch(() => {}); }, 0);
   }
 
   return (
@@ -162,19 +148,11 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
         {pestana === 'datos' && (
           <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2 className="gp-title">Datos</h2>
-            {sinConexion && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <p className="gp-hint">Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
-                <input className="gp-input" value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
-                <button type="button" className="gp-btn primary" onClick={conectarHoja}><Icon name="sheet" size={16} /><span>Conectar hoja</span></button>
-              </div>
-            )}
-            {sheets.status === 'loading' && <p className="gp-hint">Cargando hoja…</p>}
-            {sheets.status === 'error' && <p className="gp-error">No se pudo cargar la hoja. Revisa que sea pública o que tengas acceso.</p>}
+            <GoogleSheetsConnector locked={locked} />
             {sheets.status === 'ready' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div className="gp-summary">
-                  <strong>{sheets.title}</strong>
+                  <strong>{sheets.title || 'Hoja conectada'}</strong>
                   <span>{sheets.rows.length} filas</span>
                 </div>
                 <div className="gp-map">
@@ -194,7 +172,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                     {sheets.rows.map((_, indice) => <option key={indice} value={indice}>{indice + 1}</option>)}
                   </select>
                 </label>
-                <button type="button" className="gp-btn" onClick={() => connectSheet().catch(() => {})}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
+                <button type="button" className="gp-btn" onClick={onActualizarDatos}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
                 <button type="button" className="gp-btn primary" onClick={onGenerarLote} disabled={locked}><Icon name="download" size={16} /><span>Generar lote</span></button>
               </div>
             )}
