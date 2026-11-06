@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
-import { obtenerClientId, iniciarSesionGoogle, obtenerTokenValido } from '../sheets/google-auth.js';
+import { iniciarSesionGoogle, obtenerTokenValido } from '../sheets/google-auth.js';
 import { listarHojasDrive, listarPestanas, leerHojaConToken } from '../sheets/drive-client.js';
 import { normalizarRespuestaValues } from '../sheets/mapper.js';
 
@@ -10,8 +10,6 @@ const CLAVE_CONEXION = 'gimage:sheets:conexion:v1';
 function traducirError(error) {
   const mensaje = String(error?.message ?? '');
   if (/La sesión de Google expiró/i.test(mensaje)) return mensaje;
-  if (/access_denied|popup_closed/i.test(mensaje)) return 'No se completó la autorización con Google.';
-  if (/redirect_uri_mismatch|origin_mismatch/i.test(mensaje)) return 'El dominio de la app no está autorizado en Google Cloud.';
   if (/PERMISSION_DENIED|403/i.test(mensaje)) return 'No tienes permiso para acceder a esta hoja o listar archivos de Drive.';
   if (/404|not found/i.test(mensaje)) return 'No se encontró la hoja seleccionada.';
   if (/400|Unable to parse range/i.test(mensaje)) return 'Rango o pestaña inválidos.';
@@ -40,29 +38,9 @@ export default function GoogleSheetsConnector({ locked = false }) {
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
   const [pestanas, setPestanas] = useState(Array.isArray(sheets.sheetTabs) ? sheets.sheetTabs : []);
   const autoconectandoRef = useRef(false);
-  const clientId = obtenerClientId();
   const authMode = sheets.authMode ?? 'idle';
   const driveFiles = sheets.driveFiles ?? [];
   const cargando = sheets.status === 'loading';
-
-  async function conectar({ silencioso = false } = {}) {
-    setSheetsConfig({ status: 'loading', error: '' });
-    try {
-      const token = await iniciarSesionGoogle({ prompt: '' });
-      const archivos = await listarHojasDrive(token);
-      setSheetsConfig({
-        authMode: 'google',
-        accessToken: token,
-        driveFiles: archivos,
-        status: archivos.length ? 'idle' : 'error',
-        error: archivos.length ? '' : 'No se encontraron hojas de cálculo en tu Google Drive.',
-      });
-      return token;
-    } catch (error) {
-      setSheetsConfig({ status: 'error', error: traducirError(error) });
-      return '';
-    }
-  }
 
   async function cargarHoja({ token = '', spreadsheetId, sheetName, range }) {
     setSheetsConfig({ status: 'loading', error: '', activeRowIndex: null });
@@ -91,22 +69,19 @@ export default function GoogleSheetsConnector({ locked = false }) {
     autoconectandoRef.current = true;
     (async () => {
       setSheetsConfig({ ...guardada, status: 'loading', error: '' });
-      const token = await conectar({ silencioso: true });
-      if (!token) {
-        autoconectandoRef.current = false;
-        return;
-      }
       try {
-        const titulos = await listarPestanas({ accessToken: token, spreadsheetId: guardada.spreadsheetId });
-        setPestanas(titulos);
-        setSheetsConfig({ sheetTabs: titulos });
-      } catch { /* si falla, se muestra el selector manual */ }
-      await cargarHoja({
-        token,
-        spreadsheetId: guardada.spreadsheetId,
-        sheetName: guardada.sheetName,
-        range: guardada.range,
-      });
+        const token = await obtenerTokenValido();
+        const archivos = await listarHojasDrive(token);
+        setSheetsConfig({ authMode: 'google', accessToken: token, driveFiles: archivos, status: 'idle', error: '' });
+        try {
+          const titulos = await listarPestanas({ accessToken: token, spreadsheetId: guardada.spreadsheetId });
+          setPestanas(titulos);
+          setSheetsConfig({ sheetTabs: titulos });
+        } catch { /* si falla, se muestra el selector manual */ }
+        await cargarHoja({ token, spreadsheetId: guardada.spreadsheetId, sheetName: guardada.sheetName, range: guardada.range });
+      } catch (error) {
+        setSheetsConfig({ status: 'error', error: traducirError(error) });
+      }
       autoconectandoRef.current = false;
     })();
   }, []);
@@ -163,15 +138,7 @@ export default function GoogleSheetsConnector({ locked = false }) {
 
   return (
     <>
-      {!clientId && (
-        <div className="layers-empty" role="alert">
-          <Icon name="info" size={20} />
-          <strong>Falta configuración</strong>
-          <p>Define <code>VITE_GOOGLE_CLIENT_ID</code> en Vercel y vuelve a desplegar la app.</p>
-        </div>
-      )}
-
-      <button type="button" className="image-url-link" data-testid="google-connect" disabled={!clientId || cargando || locked} onClick={() => conectar()}>
+      <button type="button" className="image-url-link" data-testid="google-connect" disabled={cargando || locked} onClick={() => iniciarSesionGoogle()}>
         <Icon name="link" size={14} />
         <span>{authMode === 'google' ? 'Recargar mis hojas de Drive' : 'Conectar con Google'}</span>
       </button>
@@ -221,8 +188,8 @@ export default function GoogleSheetsConnector({ locked = false }) {
         <div className="shortcut-card">
           <span className="shortcut-icon"><Icon name="link" size={17} /></span>
           <div>
-            <strong>Conexión recordada</strong>
-            <p>La app recuerda tu hoja, pestaña y rango. Al recargar, intenta reconectar automáticamente.</p>
+            <strong>Sesión persistente</strong>
+            <p>El refresh token se guarda en una cookie httpOnly y la app renueva el acceso automáticamente.</p>
           </div>
         </div>
       </div>
