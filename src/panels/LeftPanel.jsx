@@ -32,17 +32,7 @@ function muestraCapaCss(capa) {
   return null;
 }
 
-function FieldRow({
-  campo,
-  valorDefecto,
-  onCambiarValor,
-  onRenombrar,
-  onEliminar,
-  onAplicarAImagen,
-  onInsertarEnTexto,
-  puedeAplicarAImagen,
-  puedeInsertarEnTexto,
-}) {
+function FieldRow({ campo, valorDefecto, onCambiarValor, onRenombrar, onEliminar, onAplicarAImagen, onInsertarEnTexto, puedeAplicarAImagen, puedeInsertarEnTexto }) {
   const [editando, setEditando] = useState(false);
   const [nombreDraft, setNombreDraft] = useState(campo.nombre);
   const inputRef = useRef(null);
@@ -64,7 +54,6 @@ function FieldRow({
       <span className="layer-type-badge" aria-hidden="true">
         <Icon name={campo.tipo === 'imagen' ? 'image' : 'text'} size={13} />
       </span>
-
       <div className="layer-title-cell">
         {editando ? (
           <input
@@ -95,7 +84,6 @@ function FieldRow({
           {campo.tipo === 'imagen' ? 'Imagen' : 'Texto'} · {campo.usos.length} uso(s)
         </small>
       </div>
-
       <div className="field-controls">
         <input
           type="text"
@@ -106,49 +94,20 @@ function FieldRow({
           onChange={(event) => onCambiarValor(event.target.value)}
         />
         <div className="field-actions">
-          <button
-            type="button"
-            className="layer-icon-btn"
-            aria-label={`Renombrar campo ${campo.nombre}`}
-            title="Renombrar campo"
-            onClick={() => {
-              setNombreDraft(campo.nombre);
-              setEditando(true);
-            }}
-          >
+          <button type="button" className="layer-icon-btn" aria-label={`Renombrar campo ${campo.nombre}`} title="Renombrar campo" onClick={() => { setNombreDraft(campo.nombre); setEditando(true); }}>
             <Icon name="text" size={14} />
           </button>
           {campo.tipo === 'imagen' && (
-            <button
-              type="button"
-              className="layer-icon-btn"
-              aria-label={`Usar ${campo.nombre} en la imagen seleccionada`}
-              title="Usar en imagen seleccionada"
-              disabled={!puedeAplicarAImagen}
-              onClick={onAplicarAImagen}
-            >
+            <button type="button" className="layer-icon-btn" aria-label={`Usar ${campo.nombre} en la imagen seleccionada`} title="Usar en imagen seleccionada" disabled={!puedeAplicarAImagen} onClick={onAplicarAImagen}>
               <Icon name="image" size={14} />
             </button>
           )}
           {campo.tipo === 'texto' && (
-            <button
-              type="button"
-              className="layer-icon-btn"
-              aria-label={`Insertar ${campo.nombre} en el texto seleccionado`}
-              title="Insertar en texto seleccionado"
-              disabled={!puedeInsertarEnTexto}
-              onClick={onInsertarEnTexto}
-            >
+            <button type="button" className="layer-icon-btn" aria-label={`Insertar ${campo.nombre} en el texto seleccionado`} title="Insertar en texto seleccionado" disabled={!puedeInsertarEnTexto} onClick={onInsertarEnTexto}>
               <Icon name="plus" size={14} />
             </button>
           )}
-          <button
-            type="button"
-            className="layer-icon-btn is-danger"
-            aria-label={`Eliminar campo ${campo.nombre}`}
-            title="Eliminar campo"
-            onClick={onEliminar}
-          >
+          <button type="button" className="layer-icon-btn is-danger" aria-label={`Eliminar campo ${campo.nombre}`} title="Eliminar campo" onClick={onEliminar}>
             <Icon name="trash" size={14} />
           </button>
         </div>
@@ -157,14 +116,7 @@ function FieldRow({
   );
 }
 
-export default function LeftPanel({
-  onInsertText,
-  onInsertRect,
-  onInsertCircle,
-  onInsertLine,
-  onInsertImage,
-  onImageUrl,
-}) {
+export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl }) {
   const canvas = useTemplateStore((state) => state.template.canvas);
   const capas = useTemplateStore((state) => state.template.capas);
   const fields = useTemplateStore((state) => state.fields);
@@ -182,6 +134,11 @@ export default function LeftPanel({
   const renameField = useTemplateStore((state) => state.renameField);
   const removeField = useTemplateStore((state) => state.removeField);
   const updateObject = useTemplateStore((state) => state.updateObject);
+  const sheets = useTemplateStore((state) => state.sheets);
+  const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
+  const connectSheet = useTemplateStore((state) => state.connectSheet);
+  const mapColumnToField = useTemplateStore((state) => state.mapColumnToField);
+  const disconnectSheet = useTemplateStore((state) => state.disconnectSheet);
 
   const [tab, setTab] = useState('objetos');
   const [editingId, setEditingId] = useState(null);
@@ -190,15 +147,9 @@ export default function LeftPanel({
   const [dropIndex, setDropIndex] = useState(null);
   const renameInputRef = useRef(null);
 
-  const camposDetectados = useMemo(
-    () => extraerCamposPlantilla({ capas }),
-    [capas],
-  );
-
+  const camposDetectados = useMemo(() => extraerCamposPlantilla({ capas }), [capas]);
   const capaSeleccionada = useMemo(() => (
-    selectedIds.length === 1
-      ? capas.find((capa) => capa.id === selectedIds[0]) || null
-      : null
+    selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) || null : null
   ), [capas, selectedIds]);
 
   useEffect(() => {
@@ -227,36 +178,22 @@ export default function LeftPanel({
   const puedeSubir = haySeleccion && capas.some((capa, idx) => idx < capas.length - 1 && selectedIds.includes(capa.id) && !selectedIds.includes(capas[idx + 1].id));
 
   return (
-    <aside className="sidebar" aria-label="Herramientas, campos y capas">
+    <aside className="sidebar" aria-label="Herramientas, campos, datos y capas">
       <div className="sidebar-tabs" role="tablist" aria-label="Secciones del panel izquierdo">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'objetos'}
-          className={`sidebar-tab ${tab === 'objetos' ? 'is-active' : ''}`}
-          onClick={() => setTab('objetos')}
-        >
+        <button type="button" role="tab" aria-selected={tab === 'objetos'} className={`sidebar-tab ${tab === 'objetos' ? 'is-active' : ''}`} onClick={() => setTab('objetos')}>
           <Icon name="plus" size={14} />
           <span>Elementos</span>
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'campos'}
-          className={`sidebar-tab ${tab === 'campos' ? 'is-active' : ''}`}
-          onClick={() => setTab('campos')}
-        >
+        <button type="button" role="tab" aria-selected={tab === 'campos'} className={`sidebar-tab ${tab === 'campos' ? 'is-active' : ''}`} onClick={() => setTab('campos')}>
           <Icon name="sparkle" size={14} />
           <span>Campos</span>
           <em className="layers-count">{camposDetectados.length}</em>
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'capas'}
-          className={`sidebar-tab ${tab === 'capas' ? 'is-active' : ''}`}
-          onClick={() => setTab('capas')}
-        >
+        <button type="button" role="tab" aria-selected={tab === 'datos'} className={`sidebar-tab ${tab === 'datos' ? 'is-active' : ''}`} onClick={() => setTab('datos')}>
+          <Icon name="link" size={14} />
+          <span>Datos</span>
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'capas'} className={`sidebar-tab ${tab === 'capas' ? 'is-active' : ''}`} onClick={() => setTab('capas')}>
           <Icon name="layers" size={14} />
           <span>Capas</span>
           <em className="layers-count">{capas.length}</em>
@@ -274,18 +211,11 @@ export default function LeftPanel({
             <InsertCard icon="line" title="Línea" description="Separador o trazo" onClick={onInsertLine} label="Añadir línea" />
             <InsertCard icon="image" title="Imagen" description="Sube un archivo" onClick={onInsertImage} label="Subir imagen" />
           </div>
-          <button
-            type="button"
-            className="image-url-link"
-            onClick={onImageUrl}
-            aria-label="Pegar URL de imagen"
-            title="Pegar URL de imagen"
-          >
+          <button type="button" className="image-url-link" onClick={onImageUrl} aria-label="Pegar URL de imagen" title="Pegar URL de imagen">
             <Icon name="link" size={14} />
             <span>O pega una URL de imagen</span>
             <Icon name="arrowUpRight" size={13} />
           </button>
-
           <div className="sidebar-rule details-rule" />
           <div className="section-heading"><span>LIENZO ACTUAL</span><Icon name="sliders" size={14} /></div>
           <div className="document-details">
@@ -298,7 +228,6 @@ export default function LeftPanel({
               </small>
             </div>
           </div>
-
           <div className="sidebar-bottom">
             <div className="shortcut-card">
               <span className="shortcut-icon"><Icon name="sparkle" size={17} /></span>
@@ -318,7 +247,6 @@ export default function LeftPanel({
           <p className="section-description">
             Escribe <code>{'{{nombre}}'}</code> en un texto o usa un campo en una imagen para crearlo.
           </p>
-
           {camposDetectados.length === 0 ? (
             <div className="layers-empty">
               <Icon name="sparkle" size={22} />
@@ -335,21 +263,12 @@ export default function LeftPanel({
                   onCambiarValor={(valor) => setFieldDefault(campo.nombre, valor)}
                   onRenombrar={(nuevoNombre) => renameField(campo.nombre, nuevoNombre)}
                   onEliminar={() => removeField(campo.nombre)}
-                  puedeAplicarAImagen={
-                    capaSeleccionada?.tipo === 'imagen'
-                    && !capaSeleccionada.bloqueada
-                  }
-                  puedeInsertarEnTexto={
-                    capaSeleccionada?.tipo === 'texto'
-                    && !capaSeleccionada.bloqueada
-                  }
+                  puedeAplicarAImagen={capaSeleccionada?.tipo === 'imagen' && !capaSeleccionada.bloqueada}
+                  puedeInsertarEnTexto={capaSeleccionada?.tipo === 'texto' && !capaSeleccionada.bloqueada}
                   onAplicarAImagen={() => {
                     if (!capaSeleccionada || capaSeleccionada.tipo !== 'imagen') return;
                     updateObject(capaSeleccionada.id, {
-                      imagen: {
-                        ...capaSeleccionada.imagen,
-                        src: `{{${campo.nombre}}}`,
-                      },
+                      imagen: { ...capaSeleccionada.imagen, src: `{{${campo.nombre}}}` },
                     }, { historyKey: `field:${campo.nombre}:aplicar-imagen` });
                   }}
                   onInsertarEnTexto={() => {
@@ -366,7 +285,6 @@ export default function LeftPanel({
               ))}
             </ul>
           )}
-
           <div className="sidebar-bottom">
             <div className="shortcut-card">
               <span className="shortcut-icon"><Icon name="sparkle" size={17} /></span>
@@ -379,58 +297,151 @@ export default function LeftPanel({
         </div>
       )}
 
+      {tab === 'datos' && (
+        <div className="sheets-panel" data-testid="sheets-panel">
+          <div className="section-heading"><span>GOOGLE SHEETS</span><span>05</span></div>
+          <p className="section-description">Conecta una hoja pública de solo lectura y mapea sus columnas a los campos.</p>
+
+          <label className="prop-sub-label" htmlFor="sheets-api-key">API key</label>
+          <input
+            id="sheets-api-key"
+            type="password"
+            className="layer-rename-input"
+            autoComplete="off"
+            value={sheets.apiKey}
+            onChange={(event) => setSheetsConfig({ apiKey: event.target.value })}
+          />
+
+          <label className="prop-sub-label" htmlFor="sheets-url">ID o URL de la hoja</label>
+          <input
+            id="sheets-url"
+            type="text"
+            className="layer-rename-input"
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+            value={sheets.spreadsheetId}
+            onChange={(event) => setSheetsConfig({ spreadsheetId: event.target.value })}
+          />
+
+          <div className="prop-grid-2">
+            <div>
+              <label className="prop-sub-label" htmlFor="sheets-tab">Pestaña</label>
+              <input
+                id="sheets-tab"
+                type="text"
+                className="layer-rename-input"
+                placeholder="Hoja 1"
+                value={sheets.sheetName}
+                onChange={(event) => setSheetsConfig({ sheetName: event.target.value })}
+              />
+            </div>
+            <div>
+              <label className="prop-sub-label" htmlFor="sheets-range">Rango</label>
+              <input
+                id="sheets-range"
+                type="text"
+                className="layer-rename-input"
+                value={sheets.range}
+                onChange={(event) => setSheetsConfig({ range: event.target.value })}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="image-url-link"
+            disabled={sheets.status === 'loading'}
+            onClick={connectSheet}
+          >
+            <Icon name="link" size={14} />
+            <span>{sheets.status === 'loading' ? 'Conectando…' : 'Conectar y leer'}</span>
+          </button>
+
+          {sheets.status === 'error' && (
+            <div className="layers-empty" role="alert">
+              <Icon name="info" size={20} />
+              <strong>No se pudo conectar</strong>
+              <p>{sheets.error}</p>
+            </div>
+          )}
+
+          {sheets.status === 'ready' && (
+            <>
+              <div className="section-heading">
+                <span>COLUMNAS</span>
+                <span>{sheets.rows.length} filas</span>
+              </div>
+              {sheets.headers.length === 0 ? (
+                <div className="layers-empty">
+                  <Icon name="link" size={20} />
+                  <strong>Sin columnas</strong>
+                  <p>La hoja no tiene encabezados en el rango indicado.</p>
+                </div>
+              ) : (
+                <ul className="layers-list" aria-label="Mapeo de columnas a campos">
+                  {sheets.headers.map((header) => (
+                    <li key={header} className="layer-row" data-testid={`sheet-column-${header}`}>
+                      <div className="layer-title-cell">
+                        <span className="layer-name">{header}</span>
+                      </div>
+                      <div className="field-controls">
+                        <select
+                          className="layer-rename-input"
+                          aria-label={`Campo para la columna ${header}`}
+                          value={sheets.columnToField[header] ?? ''}
+                          onChange={(event) => mapColumnToField(header, event.target.value || null)}
+                        >
+                          <option value="">Sin mapear</option>
+                          {camposDetectados.map((campo) => (
+                            <option key={campo.nombre} value={campo.nombre}>
+                              {`{{${campo.nombre}}}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button type="button" className="image-url-link" onClick={disconnectSheet}>
+                <Icon name="close" size={14} />
+                <span>Desconectar hoja</span>
+              </button>
+            </>
+          )}
+
+          <div className="sidebar-bottom">
+            <div className="shortcut-card">
+              <span className="shortcut-icon"><Icon name="link" size={17} /></span>
+              <div>
+                <strong>Permisos</strong>
+                <p>Comparte la hoja como “Cualquier persona con el enlace puede ver”. La API key se guarda solo en este navegador.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'capas' && (
-        // DECISION: no se añade agrupación persistente porque 02-esquema-plantilla.md v2 no define tipo grupo ni groupId; Shift+clic permite operar varias capas juntas.
         <div className="layers-panel" data-testid="layers-panel">
           <div className="layers-toolbar" role="toolbar" aria-label="Acciones de capas">
-            <button
-              type="button"
-              className="layer-tool-btn"
-              aria-label="Enviar capa hacia el fondo"
-              title="Enviar hacia el fondo (Ctrl+[)"
-              disabled={!puedeBajar}
-              onClick={moveSelectedBackward}
-            >
+            <button type="button" className="layer-tool-btn" aria-label="Enviar capa hacia el fondo" title="Enviar hacia el fondo (Ctrl+[)" disabled={!puedeBajar} onClick={moveSelectedBackward}>
               <Icon name="arrowUp" size={14} />
             </button>
-            <button
-              type="button"
-              className="layer-tool-btn"
-              aria-label="Traer capa hacia el frente"
-              title="Traer hacia el frente (Ctrl+])"
-              disabled={!puedeSubir}
-              onClick={moveSelectedForward}
-            >
+            <button type="button" className="layer-tool-btn" aria-label="Traer capa hacia el frente" title="Traer hacia el frente (Ctrl+])" disabled={!puedeSubir} onClick={moveSelectedForward}>
               <Icon name="arrowDown" size={14} />
             </button>
             <div className="layers-toolbar-sep" />
-            <button
-              type="button"
-              className="layer-tool-btn"
-              aria-label="Duplicar capa"
-              title="Duplicar (Ctrl+D)"
-              disabled={!algunaDesbloqueada}
-              onClick={duplicateSelected}
-            >
+            <button type="button" className="layer-tool-btn" aria-label="Duplicar capa" title="Duplicar (Ctrl+D)" disabled={!algunaDesbloqueada} onClick={duplicateSelected}>
               <Icon name="copy" size={14} />
             </button>
-            <button
-              type="button"
-              className="layer-tool-btn is-danger"
-              aria-label="Eliminar capa"
-              title="Eliminar (Supr)"
-              disabled={!algunaDesbloqueada}
-              onClick={deleteSelected}
-            >
+            <button type="button" className="layer-tool-btn is-danger" aria-label="Eliminar capa" title="Eliminar (Supr)" disabled={!algunaDesbloqueada} onClick={deleteSelected}>
               <Icon name="trash" size={14} />
             </button>
           </div>
-
           <div className="layers-order-hint">
             <span>1.ª = Fondo</span>
             <span>Última = Frente</span>
           </div>
-
           {capas.length === 0 ? (
             <div className="layers-empty">
               <Icon name="layers" size={22} />
@@ -444,7 +455,6 @@ export default function LeftPanel({
                 const editando = editingId === capa.id;
                 const muestra = muestraCapaCss(capa);
                 const esDestino = dropIndex === index && dragIndex !== null && dragIndex !== index;
-
                 return (
                   <li
                     key={capa.id}
@@ -493,7 +503,6 @@ export default function LeftPanel({
                       <Icon name={ICONO_POR_TIPO[capa.tipo] || 'square'} size={13} />
                       {muestra && <i className="layer-color-dot" style={{ background: muestra }} />}
                     </span>
-
                     <div className="layer-title-cell">
                       {editando ? (
                         <input
@@ -522,7 +531,6 @@ export default function LeftPanel({
                         <small className="layer-pos-tag">{index === 0 ? 'Fondo' : 'Frente'}</small>
                       )}
                     </div>
-
                     <div className="layer-actions" onClick={(event) => event.stopPropagation()}>
                       <button
                         type="button"

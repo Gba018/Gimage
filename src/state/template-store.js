@@ -17,16 +17,29 @@ import {
   reemplazarCampoEnCapas,
   resolverTexto,
 } from '../template/fields.js';
+import { extraerSpreadsheetId, leerHoja } from '../sheets/sheets-client.js';
+import { normalizarRespuestaValues } from '../sheets/mapper.js';
 
-// DECISION: conservar hasta 100 pasos de historial para equilibrar undo/redo profundo y consumo de memoria.
 const MAX_HISTORIAL = 100;
 const VENTANA_COALESCENCIA_MS = 350;
+const SHEETS_API_KEY_STORAGE = 'gimage_sheets_api_key';
 
 function clonar(valor) {
   if (typeof globalThis.structuredClone === 'function') {
     return globalThis.structuredClone(valor);
   }
   return JSON.parse(JSON.stringify(valor));
+}
+
+function leerApiKeyGuardada() {
+  if (typeof localStorage === 'undefined') return '';
+  return localStorage.getItem(SHEETS_API_KEY_STORAGE) || '';
+}
+
+function guardarApiKey(apiKey) {
+  if (typeof localStorage === 'undefined') return;
+  if (apiKey) localStorage.setItem(SHEETS_API_KEY_STORAGE, apiKey);
+  else localStorage.removeItem(SHEETS_API_KEY_STORAGE);
 }
 
 export function obtenerCajaTexto(capa) {
@@ -38,7 +51,6 @@ function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) {
   if (!capa || capa.tipo !== 'texto' || !capa.texto) return capa;
   const cajaBase = obtenerCajaTexto(capa);
   const caja = cambioCaja ? sincronizarCambioCajaTexto(cajaBase, cambioCaja) : cajaBase;
-  // El auto-fit debe medir el texto ya resuelto, sin mutar el token original.
   const textoParaMedir = resolverTexto(capa.texto.texto, fields);
   const fontSizeCalculado = caja.autoFit
     ? calcularFontSizeAutoFit(
@@ -71,7 +83,7 @@ function filtrarSeleccionValida(capas, selectedIds) {
   return selectedIds.filter((id) => idsExistentes.has(id));
 }
 
-// La plantilla cumple 02-esquema-plantilla.md v3 (con capa.texto.caja como fuente de verdad); selección, guías, campos por defecto e historial viven fuera del JSON.
+// La plantilla cumple 02-esquema-plantilla.md v3; la conexión y filas de Sheets son datos de sesión y no se serializan en el JSON.
 export const useTemplateStore = create((set, get) => {
   function aplicarCambio(mutador, opciones = {}) {
     set((state) => {
@@ -119,7 +131,6 @@ export const useTemplateStore = create((set, get) => {
   }
 
   return {
-    // DECISION: abrir de inmediato un proyecto vacío de 1080 × 1080 en memoria.
     template: crearPlantillaVacia(),
     fields: {},
     selectedIds: [],
@@ -131,6 +142,17 @@ export const useTemplateStore = create((set, get) => {
     _batchPushed: false,
     _lastHistoryKey: null,
     _lastHistoryTime: 0,
+    sheets: {
+      apiKey: leerApiKeyGuardada(),
+      spreadsheetId: '',
+      sheetName: '',
+      range: 'A1:Z1000',
+      headers: [],
+      rows: [],
+      columnToField: {},
+      status: 'idle',
+      error: '',
+    },
 
     beginHistoryBatch: () => set((state) => ({
       _batchDepth: state._batchDepth + 1,
@@ -459,7 +481,6 @@ export const useTemplateStore = create((set, get) => {
         copia.id = crearIdCapa(ids);
         ids.push(copia.id);
         copia.nombre = `${capa.nombre} copia`;
-        // DECISION: desplazar las copias 24 px para que no queden ocultas bajo el original.
         copia.x = Math.round(capa.x + 24);
         copia.y = Math.round(capa.y + 24);
         if (copia.tipo === 'texto') {
@@ -534,6 +555,71 @@ export const useTemplateStore = create((set, get) => {
         };
       },
     ),
+
+    setSheetsConfig: (parcial) => set((state) => {
+      const next = { ...state.sheets, ...parcial };
+      if (parcial.apiKey !== undefined) guardarApiKey(parcial.apiKey);
+      return { sheets: next };
+    }),
+
+    connectSheet: async () => {
+      const sheets = get().sheets;
+      const spreadsheetId = extraerSpreadsheetId(sheets.spreadsheetId);
+      if (!sheets.apiKey || !spreadsheetId) {
+        set({ sheets: { ...sheets, status: 'error', error: 'Ingresa una API key y un ID o URL válida de Google Sheets.' } });
+        return false;
+      }
+
+      set({ sheets: { ...sheets, status: 'loading', error: '' } });
+      try {
+        const datos = await leerHoja({
+          apiKey: sheets.apiKey,
+          spreadsheetId,
+          sheetName: sheets.sheetName,
+          range: sheets.range,
+        });
+        const { headers, rows } = normalizarRespuestaValues(datos.values);
+        set({
+          sheets: {
+            ...get().sheets,
+            spreadsheetId,
+            headers,
+            rows,
+            columnToField: {},
+            status: 'ready',
+            error: '',
+          },
+        });
+        return true;
+      } catch (error) {
+        set({
+          sheets: {
+            ...get().sheets,
+            status: 'error',
+            error: error.message || 'No se pudo leer la hoja.',
+          },
+        });
+        return false;
+      }
+    },
+
+    mapColumnToField: (columna, campo) => set((state) => {
+      const columnToField = { ...state.sheets.columnToField };
+      if (!campo) delete columnToField[columna];
+      else columnToField[columna] = campo;
+      return { sheets: { ...state.sheets, columnToField } };
+    }),
+
+    disconnectSheet: () => set((state) => ({
+      sheets: {
+        ...state.sheets,
+        headers: [],
+        rows: [],
+        columnToField: {},
+        status: 'idle',
+        error: '',
+      },
+    })),
 
     addGuide: (orientation, position) => set((state) => ({
       guides: [...state.guides, { id: `guide_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, orientation, position }],
