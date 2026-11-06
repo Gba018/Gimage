@@ -60,11 +60,42 @@ const ESTILOS = `
 .gp-preview{display:flex;flex-direction:column;gap:6px;}
 .gp-preview-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cbd5f5;}
 .gp-preview-row strong{color:#7dd3fc;font-weight:600;}
+.gp-column{border:1px solid #1e293b;border-radius:10px;padding:8px 10px;background:#111c2e;}
+.gp-column-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.gp-column-head strong{font-size:12px;color:#f8fafc;}
+.gp-status{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;border-radius:999px;}
+.gp-status.is-mapped{background:#064e3b;color:#6ee7b7;}
+.gp-status.is-suggested{background:#78350f;color:#fcd34d;}
+.gp-status.is-empty{background:#1e293b;color:#94a3b8;}
+.gp-column-hint{margin:0 0 6px;font-size:11px;color:#94a3b8;}
+.gp-column-hint.is-suggested{color:#fcd34d;}
 `;
+
+function normalizarTexto(valor) {
+  return String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function buscarCoincidencia(header, nombres) {
+  const columna = normalizarTexto(header);
+  if (!columna) return '';
+  const exacta = nombres.find((nombre) => normalizarTexto(nombre) === columna);
+  if (exacta) return exacta;
+  const parcial = nombres.find((nombre) => {
+    const limpio = normalizarTexto(nombre);
+    return limpio && (columna.includes(limpio) || limpio.includes(columna));
+  });
+  return parcial ?? '';
+}
 
 export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, onActualizarDatos, loteEstado, locked }) {
   const [pestana, setPestana] = useState('elementos');
   const [nuevoCampo, setNuevoCampo] = useState('');
+  const [busquedaDraft, setBusquedaDraft] = useState('');
+  const [busquedaColumna, setBusquedaColumna] = useState('');
   const template = useTemplateStore((state) => state.template);
   const fields = useTemplateStore((state) => state.fields);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
@@ -109,10 +140,21 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       return { indice, url: campoImagen ? String(valores[campoImagen.nombre]) : '', etiqueta: `Fila ${indice + 1}` };
     });
   }, [sheets.rows, sheets.activeRowIndex, sheets.headers, sheets.columnToField, fields, camposDetectados]);
+  const columnasFiltradas = useMemo(() => {
+    const busqueda = normalizarTexto(busquedaColumna);
+    if (!busqueda) return sheets.headers;
+    return sheets.headers.filter((header) => normalizarTexto(header).includes(busqueda));
+  }, [busquedaColumna, sheets.headers]);
+  const columnasMapeadas = Object.keys(sheets.columnToField).length;
 
   useEffect(() => {
     if (sheets.status === 'ready' && sheets.rows.length && sheets.activeRowIndex == null) setActiveRowIndex(0);
   }, [sheets.status, sheets.rows.length, sheets.activeRowIndex, setActiveRowIndex]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBusquedaColumna(busquedaDraft), 180);
+    return () => window.clearTimeout(timer);
+  }, [busquedaDraft]);
 
   function irAFila(indice) {
     if (locked || indice < 0 || indice >= sheets.rows.length) return;
@@ -137,6 +179,18 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     if (!nombre || fields[nombre]) return;
     addField(nombre);
     setNuevoCampo('');
+  }
+
+  function mapearAutomatico() {
+    sheets.headers.forEach((header) => {
+      if (sheets.columnToField[header]) return;
+      const coincidencia = buscarCoincidencia(header, nombresCampos);
+      if (coincidencia) setColumnField(header, coincidencia);
+    });
+  }
+
+  function limpiarMapeo() {
+    Object.keys(sheets.columnToField).forEach((header) => setColumnField(header, ''));
   }
 
   return (
@@ -209,18 +263,34 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div className="gp-summary">
                   <strong>{sheets.title || 'Hoja conectada'}</strong>
-                  <span>{sheets.rows.length} filas</span>
+                  <span>{columnasMapeadas}/{sheets.headers.length} mapeadas</span>
+                </div>
+                <input className="gp-input" type="search" placeholder="Buscar columna…" value={busquedaDraft} onChange={(event) => setBusquedaDraft(event.target.value)} aria-label="Buscar columna" />
+                <div className="gp-row">
+                  <button type="button" className="gp-btn" onClick={mapearAutomatico} disabled={locked || !nombresCampos.length} title="Mapear columnas con coincidencias"><Icon name="sparkle" size={15} /><span>Mapeo automático</span></button>
+                  <button type="button" className="gp-btn" onClick={limpiarMapeo} disabled={locked || !columnasMapeadas} title="Limpiar mapeo"><Icon name="close" size={15} /><span>Limpiar</span></button>
                 </div>
                 <div className="gp-map">
-                  {sheets.headers.map((columna) => (
-                    <label key={columna} className="gp-map-row">
-                      <span>{columna}</span>
-                      <select className="gp-select" value={sheets.columnToField[columna] ?? ''} onChange={(event) => setColumnField(columna, event.target.value)}>
-                        <option value="">Sin mapear</option>
-                        {nombresCampos.map((nombre) => <option key={nombre} value={nombre}>{`[${nombre}]`}</option>)}
-                      </select>
-                    </label>
-                  ))}
+                  {columnasFiltradas.map((header) => {
+                    const campo = sheets.columnToField[header];
+                    const sugerido = !campo ? buscarCoincidencia(header, nombresCampos) : '';
+                    const estado = campo ? 'is-mapped' : (sugerido ? 'is-suggested' : 'is-empty');
+                    const etiqueta = campo ? 'Mapeada' : (sugerido ? 'Sugerida' : 'Sin mapear');
+                    return (
+                      <div key={header} className="gp-column">
+                        <div className="gp-column-head">
+                          <strong>{header}</strong>
+                          <span className={`gp-status ${estado}`}>{etiqueta}</span>
+                        </div>
+                        {sugerido && <p className="gp-column-hint is-suggested">Coincidencia sugerida: [{sugerido}]</p>}
+                        <select className="gp-select" value={campo ?? ''} disabled={locked} onChange={(event) => setColumnField(header, event.target.value)} aria-label={`Campo para la columna ${header}`}>
+                          <option value="">Sin mapear</option>
+                          {nombresCampos.map((nombre) => <option key={nombre} value={nombre}>{`[${nombre}]`}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })}
+                  {columnasFiltradas.length === 0 && <p className="gp-hint">No hay columnas que coincidan con la búsqueda.</p>}
                 </div>
                 <div className="gp-nav">
                   <button type="button" className="gp-icon-btn" title="Fila anterior (←)" disabled={locked || indiceActivo <= 0} onClick={() => irAFila(indiceActivo - 1)}>←</button>
