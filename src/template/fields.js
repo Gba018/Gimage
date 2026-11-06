@@ -34,9 +34,15 @@ export function extraerCamposPlantilla(template) {
   return Array.from(mapa.values());
 }
 
+function obtenerValorCampo(fields = {}, nombre) {
+  const valor = fields?.[nombre];
+  if (valor && typeof valor === 'object') return valor.defaultValue;
+  return valor;
+}
+
 export function resolverTexto(texto, fields = {}) {
   return String(texto ?? '').replace(/\{\{\s*([a-z0-9_-]+)\s*\}\}/g, (match, nombre) => {
-    const valor = fields[nombre]?.defaultValue;
+    const valor = obtenerValorCampo(fields, nombre);
     return valor == null || valor === '' ? `[${nombre}]` : String(valor);
   });
 }
@@ -44,7 +50,7 @@ export function resolverTexto(texto, fields = {}) {
 export function resolverImagenSrc(src, fields = {}) {
   const coincidencia = String(src ?? '').trim().match(/^\{\{\s*([a-z0-9_-]+)\s*\}\}$/);
   if (!coincidencia) return String(src ?? '');
-  const valor = fields[coincidencia[1]]?.defaultValue;
+  const valor = obtenerValorCampo(fields, coincidencia[1]);
   return valor == null ? '' : String(valor);
 }
 
