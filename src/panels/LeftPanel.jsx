@@ -3,12 +3,11 @@ import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { normalizarNombreCampo } from '../template/fields.js';
 
-const OPCIONES_FUENTE = [
-  { id: 'texto', label: 'Texto', icon: 'text' },
-  { id: 'formas', label: 'Formas', icon: 'shapes' },
-  { id: 'imagen', label: 'Imagen', icon: 'image' },
+const PESTANAS = [
+  { id: 'elementos', label: 'Elementos', icon: 'shapes' },
   { id: 'campos', label: 'Campos', icon: 'fields' },
-  { id: 'hoja', label: 'Hoja', icon: 'sheet' },
+  { id: 'datos', label: 'Datos', icon: 'sheet' },
+  { id: 'capas', label: 'Capas', icon: 'layers' },
 ];
 
 const ESTILOS = `
@@ -37,6 +36,9 @@ const ESTILOS = `
 .gp-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#cbd5f5;cursor:pointer;}
 .gp-icon-btn:hover:not(:disabled){background:#334155;}
 .gp-icon-btn:disabled{opacity:.4;cursor:not-allowed;}
+.gp-layer{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid #1e293b;background:#111c2e;}
+.gp-layer.is-selected{border-color:#0ea5e9;background:#0c2436;}
+.gp-layer-name{flex:1;min-width:0;font-size:12px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .gp-map{display:flex;flex-direction:column;gap:8px;}
 .gp-map-row{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;font-size:12px;color:#cbd5f5;}
 .gp-summary{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;background:#111c2e;border:1px solid #1e293b;font-size:12px;}
@@ -50,7 +52,7 @@ const ESTILOS = `
 `;
 
 export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, loteEstado, locked }) {
-  const [fuente, setFuente] = useState('texto');
+  const [pestana, setPestana] = useState('elementos');
   const [nuevoCampo, setNuevoCampo] = useState('');
   const template = useTemplateStore((state) => state.template);
   const fields = useTemplateStore((state) => state.fields);
@@ -62,11 +64,17 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const setFieldDefault = useTemplateStore((state) => state.setFieldDefault);
   const setColumnField = useTemplateStore((state) => state.setColumnField);
   const setActiveRowIndex = useTemplateStore((state) => state.setActiveRowIndex);
+  const selectLayer = useTemplateStore((state) => state.selectLayer);
+  const renameLayer = useTemplateStore((state) => state.renameLayer);
+  const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
+  const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
+  const reorderLayer = useTemplateStore((state) => state.reorderLayer);
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
   const connectSheet = useTemplateStore((state) => state.connectSheet);
   const [sheetUrl, setSheetUrl] = useState(sheets.spreadsheetId || '');
   const campos = useMemo(() => Object.values(fields), [fields]);
-  const campoSeleccionado = selectedIds.length === 1 ? template.capas.find((capa) => capa.id === selectedIds[0]) : null;
+  const capas = template.capas;
+  const campoSeleccionado = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
 
   useEffect(() => {
@@ -92,8 +100,8 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     <aside className="gp-left">
       <style>{ESTILOS}</style>
       <div className="gp-tabs" role="tablist">
-        {OPCIONES_FUENTE.map((opcion) => (
-          <button key={opcion.id} type="button" role="tab" aria-selected={fuente === opcion.id} className={`gp-tab ${fuente === opcion.id ? 'is-active' : ''}`} onClick={() => setFuente(opcion.id)}>
+        {PESTANAS.map((opcion) => (
+          <button key={opcion.id} type="button" role="tab" aria-selected={pestana === opcion.id} className={`gp-tab ${pestana === opcion.id ? 'is-active' : ''}`} onClick={() => setPestana(opcion.id)}>
             <Icon name={opcion.icon} size={16} />
             <span>{opcion.label}</span>
           </button>
@@ -101,35 +109,22 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       </div>
 
       <div className="gp-body">
-        {fuente === 'texto' && (
-          <section>
-            <h2 className="gp-title">Texto</h2>
-            <p className="gp-hint">Añade un cuadro de texto editable al lienzo.</p>
-            <button type="button" className="gp-btn primary" onClick={onInsertText} disabled={locked}><Icon name="plus" size={16} /><span>Añadir texto</span></button>
-          </section>
-        )}
-
-        {fuente === 'formas' && (
-          <section>
-            <h2 className="gp-title">Formas</h2>
+        {pestana === 'elementos' && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h2 className="gp-title">Elementos</h2>
+            <p className="gp-hint">Añade contenido al lienzo.</p>
+            <button type="button" className="gp-btn primary" onClick={onInsertText} disabled={locked}><Icon name="text" size={16} /><span>Añadir texto</span></button>
             <div className="gp-shapes">
               <button type="button" className="gp-shape" onClick={onInsertRect} disabled={locked}><Icon name="square" size={20} /><span>Rectángulo</span></button>
               <button type="button" className="gp-shape" onClick={onInsertCircle} disabled={locked}><Icon name="circle" size={20} /><span>Círculo</span></button>
               <button type="button" className="gp-shape" onClick={onInsertLine} disabled={locked}><Icon name="line" size={20} /><span>Línea</span></button>
             </div>
-          </section>
-        )}
-
-        {fuente === 'imagen' && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <h2 className="gp-title">Imagen</h2>
-            <p className="gp-hint">Usa un archivo local o una URL directa.</p>
             <button type="button" className="gp-btn" onClick={onInsertImage} disabled={locked}><Icon name="image" size={16} /><span>Añadir imagen</span></button>
-            <button type="button" className="gp-btn" onClick={onImageUrl} disabled={locked}><Icon name="link" size={16} /><span>Desde URL</span></button>
+            <button type="button" className="gp-btn" onClick={onImageUrl} disabled={locked}><Icon name="link" size={16} /><span>Imagen desde URL</span></button>
           </section>
         )}
 
-        {fuente === 'campos' && (
+        {pestana === 'campos' && (
           <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2 className="gp-title">Campos</h2>
             <p className="gp-hint">Escribe <code>[nombre]</code> en el texto de una capa para crear un campo dinámico.</p>
@@ -163,9 +158,9 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
           </section>
         )}
 
-        {fuente === 'hoja' && (
+        {pestana === 'datos' && (
           <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <h2 className="gp-title">Hoja de cálculo</h2>
+            <h2 className="gp-title">Datos</h2>
             {sheets.status === 'disconnected' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <p className="gp-hint">Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
@@ -218,6 +213,26 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 )}
               </div>
             )}
+          </section>
+        )}
+
+        {pestana === 'capas' && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h2 className="gp-title">Capas</h2>
+            <p className="gp-hint">Selecciona, renombra, oculta, bloquea o reordena los elementos.</p>
+            {[...capas].map((capa) => (
+              <div key={capa.id} className={`gp-layer ${selectedIds.includes(capa.id) ? 'is-selected' : ''}`}>
+                <button type="button" className="gp-icon-btn" title={capa.visible ? 'Ocultar' : 'Mostrar'} onClick={() => toggleLayerVisible(capa.id)}>{capa.visible ? '👁' : '🚫'}</button>
+                <button type="button" className="gp-icon-btn" title={capa.bloqueada ? 'Desbloquear' : 'Bloquear'} onClick={() => toggleLayerLocked(capa.id)}>{capa.bloqueada ? '🔓' : '🔒'}</button>
+                <button type="button" className="gp-layer-name" style={{ background: 'transparent', border: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit', padding: 0 }} onClick={() => selectLayer(capa.id)} onDoubleClick={() => {
+                  const nombre = window.prompt('Nuevo nombre de la capa', capa.nombre);
+                  if (nombre) renameLayer(capa.id, nombre);
+                }} title="Clic para seleccionar; doble clic para renombrar">{capa.nombre}</button>
+                <button type="button" className="gp-icon-btn" title="Subir" disabled={locked} onClick={() => reorderLayer(capas.findIndex((item) => item.id === capa.id), Math.min(capas.length - 1, capas.findIndex((item) => item.id === capa.id) + 1))}>↑</button>
+                <button type="button" className="gp-icon-btn" title="Bajar" disabled={locked} onClick={() => reorderLayer(capas.findIndex((item) => item.id === capa.id), Math.max(0, capas.findIndex((item) => item.id === capa.id) - 1))}>↓</button>
+              </div>
+            ))}
+            {capas.length === 0 && <p className="gp-hint">Todavía no hay capas en el lienzo.</p>}
           </section>
         )}
       </div>
