@@ -19,6 +19,11 @@ import {
 } from '../template/fields.js';
 import { extraerSpreadsheetId, leerHoja } from '../sheets/sheets-client.js';
 import { normalizarRespuestaValues } from '../sheets/mapper.js';
+import {
+  guardarPlantillaLocal,
+  leerPlantillaLocal,
+  parsearPlantilla,
+} from '../template/persistencia.js';
 
 const MAX_HISTORIAL = 100;
 const VENTANA_COALESCENCIA_MS = 350;
@@ -130,6 +135,22 @@ export const useTemplateStore = create((set, get) => {
     });
   }
 
+  function cargarDatos(datos) {
+    const plantilla = hidratarPlantilla(clonar(datos.template));
+    set((state) => ({
+      template: plantilla,
+      fields: clonar(datos.fields ?? {}),
+      selectedIds: [],
+      guides: [],
+      past: [],
+      future: [],
+      _batchDepth: 0,
+      _batchPushed: false,
+      _lastHistoryKey: null,
+      projectRevision: state.projectRevision + 1,
+    }));
+  }
+
   return {
     template: crearPlantillaVacia(),
     fields: {},
@@ -224,6 +245,28 @@ export const useTemplateStore = create((set, get) => {
       _lastHistoryKey: null,
       projectRevision: state.projectRevision + 1,
     })),
+
+    guardarEnNavegador: () => {
+      const { template, fields } = get();
+      return guardarPlantillaLocal(template, fields);
+    },
+
+    cargarDesdeNavegador: () => {
+      const datos = leerPlantillaLocal();
+      if (!datos?.template) return false;
+      cargarDatos(datos);
+      return true;
+    },
+
+    importarPlantilla: (texto) => {
+      try {
+        const datos = parsearPlantilla(texto);
+        cargarDatos(datos);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error.message || 'No se pudo abrir la plantilla.' };
+      }
+    },
 
     setName: (nombre) => aplicarCambio(
       (state) => ({ template: { ...state.template, nombre } }),

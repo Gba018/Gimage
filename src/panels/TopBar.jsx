@@ -14,6 +14,8 @@ export default function TopBar({
   onInsertCircle,
   onInsertLine,
   onInsertImage,
+  onOpenTemplate,
+  onSaveTemplate,
 }) {
   const nombre = useTemplateStore((state) => state.template.nombre);
   const canvas = useTemplateStore((state) => state.template.canvas);
@@ -92,6 +94,14 @@ export default function TopBar({
         <button type="button" className="icon-button" aria-label="Acercar" title="Acercar" onClick={onZoomIn}><Icon name="plus" size={16} /></button>
         <button type="button" className="zoom-100" onClick={onZoom100} title="Ajustar al 100 %">100%</button>
         <button type="button" className="icon-button fit-button" onClick={onFit} aria-label="Ajustar a pantalla" title="Ajustar a pantalla"><Icon name="fit" size={17} /></button>
+      </div>
+      <div className="project-actions" aria-label="Guardar y abrir plantilla">
+        <button type="button" className="icon-button" onClick={onOpenTemplate} aria-label="Abrir plantilla JSON" title="Abrir plantilla JSON">
+          <Icon name="folder" size={16} />
+        </button>
+        <button type="button" className="icon-button" onClick={onSaveTemplate} aria-label="Guardar plantilla como archivo JSON" title="Guardar plantilla como archivo JSON">
+          <Icon name="download" size={16} />
+        </button>
       </div>
       <button type="button" className="new-project-button" onClick={onNewProject} aria-label="Nuevo proyecto">
         <Icon name="plus" size={16} /><span>Nuevo proyecto</span>
