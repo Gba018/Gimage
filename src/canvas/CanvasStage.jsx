@@ -122,7 +122,6 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
       scaleY: stage.scaleY(),
     };
 
-    // Renderiza siempre el lienzo completo en su origen, sin el zoom/pan del editor.
     stage.setAttrs({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
     setExportando(true);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -221,14 +220,16 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     }
     function stop() { cleanup(); setPanning(false); }
     function cleanup() {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
       window.removeEventListener('blur', stop);
       panCleanupRef.current = null;
     }
     panCleanupRef.current = cleanup;
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', stop);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
     window.addEventListener('blur', stop);
   }
 
