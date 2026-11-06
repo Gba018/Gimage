@@ -529,7 +529,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         <div className="workspace-crumb">
           <span>ESPACIO DE TRABAJO</span>
           <Icon name="chevron" size={13} />
-          <strong>Lienzo</strong>
+          <strong>Gimage</strong>
           <span className="workspace-live-dot" />
         </div>
         <div className="selection-status" aria-live="polite">
