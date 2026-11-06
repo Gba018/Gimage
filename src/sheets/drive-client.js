@@ -30,6 +30,29 @@ export async function listarHojasDrive(accessToken) {
   return archivos.sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'es', { sensitivity: 'base' }));
 }
 
+export async function listarPestanas({ accessToken, spreadsheetId }) {
+  if (!accessToken) throw new Error('Inicia sesión con Google para leer las pestañas.');
+  const id = String(spreadsheetId ?? '').trim();
+  if (!id) throw new Error('Selecciona una hoja de Google Drive.');
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(id)}?fields=sheets.properties.title`;
+  const respuesta = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!respuesta.ok) {
+    if (respuesta.status === 401) throw new Error('La sesión de Google expiró. Vuelve a conectar tu cuenta.');
+    if (respuesta.status === 403) throw new Error('No tienes permiso para leer las pestañas de esta hoja.');
+    if (respuesta.status === 404) throw new Error('No se encontró la hoja seleccionada.');
+    throw new Error(`Google Sheets respondió con error ${respuesta.status}.`);
+  }
+
+  const datos = await respuesta.json();
+  return (datos.sheets ?? [])
+    .map((hoja) => hoja.properties?.title)
+    .filter(Boolean);
+}
+
 export async function leerHojaConToken({ accessToken, spreadsheetId, sheetName, range }) {
   if (!accessToken) throw new Error('Inicia sesión con Google para leer la hoja.');
   const id = String(spreadsheetId ?? '').trim();

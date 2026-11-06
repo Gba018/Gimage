@@ -24,7 +24,7 @@ function cargarGis() {
   return cargaGis;
 }
 
-export async function iniciarSesionGoogle() {
+export async function iniciarSesionGoogle({ prompt = '' } = {}) {
   const clientId = obtenerClientId();
   if (!clientId) throw new Error('Falta configurar VITE_GOOGLE_CLIENT_ID para iniciar sesión con Google.');
   await cargarGis();
@@ -44,7 +44,7 @@ export async function iniciarSesionGoogle() {
       },
       error_callback: (error) => reject(new Error(error?.message || 'No se pudo autorizar el acceso a Google.')),
     });
-    tokenClient.requestAccessToken({ prompt: '' });
+    tokenClient.requestAccessToken({ prompt });
   });
 }
 
@@ -53,5 +53,5 @@ export function obtenerTokenGoogle() {
 }
 
 export async function obtenerTokenValido() {
-  return obtenerTokenGoogle() || iniciarSesionGoogle();
+  return obtenerTokenGoogle() || iniciarSesionGoogle({ prompt: '' });
 }

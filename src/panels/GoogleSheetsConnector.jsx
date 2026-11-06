@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { obtenerClientId, iniciarSesionGoogle, obtenerTokenValido } from '../sheets/google-auth.js';
-import { listarHojasDrive, leerHojaConToken } from '../sheets/drive-client.js';
+import { listarHojasDrive, listarPestanas, leerHojaConToken } from '../sheets/drive-client.js';
 import { normalizarRespuestaValues } from '../sheets/mapper.js';
+
+const CLAVE_CONEXION = 'gimage:sheets:conexion:v1';
 
 function traducirError(error) {
   const mensaje = String(error?.message ?? '');
@@ -16,18 +18,37 @@ function traducirError(error) {
   return mensaje || 'No se pudo conectar con Google.';
 }
 
+function cargarConexionGuardada() {
+  try {
+    const crudo = localStorage.getItem(CLAVE_CONEXION);
+    return crudo ? JSON.parse(crudo) : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarConexion(conexion) {
+  try { localStorage.setItem(CLAVE_CONEXION, JSON.stringify(conexion)); } catch { /* almacenamiento no disponible */ }
+}
+
+function borrarConexion() {
+  try { localStorage.removeItem(CLAVE_CONEXION); } catch { /* almacenamiento no disponible */ }
+}
+
 export default function GoogleSheetsConnector({ locked = false }) {
   const sheets = useTemplateStore((state) => state.sheets);
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
+  const [pestanas, setPestanas] = useState(Array.isArray(sheets.sheetTabs) ? sheets.sheetTabs : []);
+  const autoconectandoRef = useRef(false);
   const clientId = obtenerClientId();
   const authMode = sheets.authMode ?? 'idle';
   const driveFiles = sheets.driveFiles ?? [];
   const cargando = sheets.status === 'loading';
 
-  async function conectar() {
+  async function conectar({ silencioso = false } = {}) {
     setSheetsConfig({ status: 'loading', error: '' });
     try {
-      const token = await iniciarSesionGoogle();
+      const token = await iniciarSesionGoogle({ prompt: '' });
       const archivos = await listarHojasDrive(token);
       setSheetsConfig({
         authMode: 'google',
@@ -36,44 +57,21 @@ export default function GoogleSheetsConnector({ locked = false }) {
         status: archivos.length ? 'idle' : 'error',
         error: archivos.length ? '' : 'No se encontraron hojas de cálculo en tu Google Drive.',
       });
+      return token;
     } catch (error) {
       setSheetsConfig({ status: 'error', error: traducirError(error) });
+      return '';
     }
   }
 
-  function seleccionarArchivo(id) {
-    const archivo = driveFiles.find((item) => item.id === id);
-    if (!archivo) return;
-    setSheetsConfig({
-      selectedDriveFileId: archivo.id,
-      selectedDriveFileName: archivo.name,
-      spreadsheetId: archivo.id,
-      headers: [],
-      rows: [],
-      columnToField: {},
-      activeRowIndex: null,
-      status: 'idle',
-      error: '',
-    });
-  }
-
-  async function leerHoja() {
-    if (!sheets.selectedDriveFileId) {
-      setSheetsConfig({ status: 'error', error: 'Selecciona una hoja de Google Drive.' });
-      return;
-    }
+  async function cargarHoja({ token = '', spreadsheetId, sheetName, range }) {
     setSheetsConfig({ status: 'loading', error: '', activeRowIndex: null });
     try {
-      const token = await obtenerTokenValido();
-      const datos = await leerHojaConToken({
-        accessToken: token,
-        spreadsheetId: sheets.selectedDriveFileId,
-        sheetName: sheets.sheetName,
-        range: sheets.range,
-      });
+      const tokenValido = token || await obtenerTokenValido();
+      const datos = await leerHojaConToken({ accessToken: tokenValido, spreadsheetId, sheetName, range });
       const { headers, rows } = normalizarRespuestaValues(datos.values);
       setSheetsConfig({
-        accessToken: token,
+        accessToken: tokenValido,
         headers,
         rows,
         columnToField: {},
@@ -86,6 +84,83 @@ export default function GoogleSheetsConnector({ locked = false }) {
     }
   }
 
+  useEffect(() => {
+    if (autoconectandoRef.current) return;
+    const guardada = cargarConexionGuardada();
+    if (!guardada?.spreadsheetId) return;
+    autoconectandoRef.current = true;
+    (async () => {
+      setSheetsConfig({ ...guardada, status: 'loading', error: '' });
+      const token = await conectar({ silencioso: true });
+      if (!token) {
+        autoconectandoRef.current = false;
+        return;
+      }
+      try {
+        const titulos = await listarPestanas({ accessToken: token, spreadsheetId: guardada.spreadsheetId });
+        setPestanas(titulos);
+        setSheetsConfig({ sheetTabs: titulos });
+      } catch { /* si falla, se muestra el selector manual */ }
+      await cargarHoja({
+        token,
+        spreadsheetId: guardada.spreadsheetId,
+        sheetName: guardada.sheetName,
+        range: guardada.range,
+      });
+      autoconectandoRef.current = false;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (sheets.authMode === 'google' && sheets.spreadsheetId) {
+      guardarConexion({
+        spreadsheetId: sheets.spreadsheetId,
+        selectedDriveFileId: sheets.selectedDriveFileId,
+        selectedDriveFileName: sheets.selectedDriveFileName,
+        sheetName: sheets.sheetName,
+        range: sheets.range,
+      });
+    }
+    if (sheets.authMode === 'google' && !sheets.spreadsheetId) borrarConexion();
+  }, [sheets.authMode, sheets.spreadsheetId, sheets.selectedDriveFileId, sheets.selectedDriveFileName, sheets.sheetName, sheets.range]);
+
+  async function seleccionarArchivo(id) {
+    const archivo = driveFiles.find((item) => item.id === id);
+    if (!archivo) return;
+    setSheetsConfig({
+      selectedDriveFileId: archivo.id,
+      selectedDriveFileName: archivo.name,
+      spreadsheetId: archivo.id,
+      headers: [],
+      rows: [],
+      columnToField: {},
+      activeRowIndex: null,
+      status: 'loading',
+      error: '',
+    });
+    try {
+      const token = await obtenerTokenValido();
+      const titulos = await listarPestanas({ accessToken: token, spreadsheetId: archivo.id });
+      setPestanas(titulos);
+      const primera = titulos[0] ?? '';
+      setSheetsConfig({ sheetTabs: titulos, sheetName: primera, status: 'idle' });
+      if (primera) {
+        await cargarHoja({ token, spreadsheetId: archivo.id, sheetName: primera, range: useTemplateStore.getState().sheets.range });
+      }
+    } catch (error) {
+      setSheetsConfig({ status: 'error', error: traducirError(error) });
+    }
+  }
+
+  async function cambiarPestana(nombre) {
+    setSheetsConfig({ sheetName: nombre, status: 'loading', error: '' });
+    await cargarHoja({
+      spreadsheetId: sheets.spreadsheetId,
+      sheetName: nombre,
+      range: useTemplateStore.getState().sheets.range,
+    });
+  }
+
   return (
     <>
       {!clientId && (
@@ -96,7 +171,7 @@ export default function GoogleSheetsConnector({ locked = false }) {
         </div>
       )}
 
-      <button type="button" className="image-url-link" data-testid="google-connect" disabled={!clientId || cargando || locked} onClick={conectar}>
+      <button type="button" className="image-url-link" data-testid="google-connect" disabled={!clientId || cargando || locked} onClick={() => conectar()}>
         <Icon name="link" size={14} />
         <span>{authMode === 'google' ? 'Recargar mis hojas de Drive' : 'Conectar con Google'}</span>
       </button>
@@ -112,7 +187,14 @@ export default function GoogleSheetsConnector({ locked = false }) {
           <div className="prop-grid-2">
             <div>
               <label className="prop-sub-label" htmlFor="sheets-tab">Pestaña</label>
-              <input id="sheets-tab" type="text" className="layer-rename-input" placeholder="Hoja 1" value={sheets.sheetName} disabled={locked} onChange={(event) => setSheetsConfig({ sheetName: event.target.value })} />
+              {pestanas.length > 0 ? (
+                <select id="sheets-tab" className="layer-rename-input" data-testid="sheets-tab" value={sheets.sheetName} disabled={locked || cargando} onChange={(event) => cambiarPestana(event.target.value)}>
+                  <option value="">Elegí una pestaña…</option>
+                  {pestanas.map((titulo) => (<option key={titulo} value={titulo}>{titulo}</option>))}
+                </select>
+              ) : (
+                <input id="sheets-tab" type="text" className="layer-rename-input" placeholder="Hoja 1" value={sheets.sheetName} disabled={locked} onChange={(event) => setSheetsConfig({ sheetName: event.target.value })} />
+              )}
             </div>
             <div>
               <label className="prop-sub-label" htmlFor="sheets-range">Rango</label>
@@ -120,7 +202,7 @@ export default function GoogleSheetsConnector({ locked = false }) {
             </div>
           </div>
 
-          <button type="button" className="image-url-link" disabled={!sheets.selectedDriveFileId || cargando || locked} onClick={leerHoja}>
+          <button type="button" className="image-url-link" disabled={!sheets.selectedDriveFileId || cargando || locked} onClick={() => cargarHoja({ spreadsheetId: sheets.spreadsheetId, sheetName: sheets.sheetName, range: sheets.range })}>
             <Icon name="link" size={14} />
             <span>{cargando ? 'Conectando…' : 'Conectar y leer'}</span>
           </button>
@@ -139,8 +221,8 @@ export default function GoogleSheetsConnector({ locked = false }) {
         <div className="shortcut-card">
           <span className="shortcut-icon"><Icon name="link" size={17} /></span>
           <div>
-            <strong>Permisos</strong>
-            <p>La app solicita acceso de solo lectura a Sheets y Drive. El token permanece en esta sesión del navegador.</p>
+            <strong>Conexión recordada</strong>
+            <p>La app recuerda tu hoja, pestaña y rango. Al recargar, intenta reconectar automáticamente.</p>
           </div>
         </div>
       </div>
