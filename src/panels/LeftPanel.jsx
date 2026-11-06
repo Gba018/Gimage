@@ -2,13 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
 import { esFillDegradado, fillACss } from '../template/schema.js';
-import {
-  extraerCamposPlantilla,
-} from '../template/fields.js';
+import { extraerCamposPlantilla } from '../template/fields.js';
 
-function InsertCard({ icon, title, description, onClick, label }) {
+function InsertCard({ icon, title, description, onClick, label, disabled }) {
   return (
-    <button type="button" className="insert-card" onClick={onClick} aria-label={label} title={label}>
+    <button type="button" className="insert-card" onClick={onClick} aria-label={label} title={label} disabled={disabled}>
       <span className={`insert-icon insert-icon-${icon}`}><Icon name={icon} size={18} /></span>
       <span className="insert-copy"><strong>{title}</strong><small>{description}</small></span>
       <span className="insert-plus"><Icon name="plus" size={15} /></span>
@@ -116,7 +114,18 @@ function FieldRow({ campo, valorDefecto, onCambiarValor, onRenombrar, onEliminar
   );
 }
 
-export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl }) {
+export default function LeftPanel({
+  onInsertText,
+  onInsertRect,
+  onInsertCircle,
+  onInsertLine,
+  onInsertImage,
+  onImageUrl,
+  onGenerarLote,
+  onCancelarLote,
+  loteEstado,
+  locked = false,
+}) {
   const canvas = useTemplateStore((state) => state.template.canvas);
   const capas = useTemplateStore((state) => state.template.capas);
   const fields = useTemplateStore((state) => state.fields);
@@ -152,6 +161,9 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const capaSeleccionada = useMemo(() => (
     selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) || null : null
   ), [capas, selectedIds]);
+  const columnasMapeadas = Object.keys(sheets.columnToField).length;
+  const puedeGenerarLote = sheets.status === 'ready' && sheets.rows.length > 0 && columnasMapeadas > 0;
+  const generando = loteEstado.estado === 'generando';
 
   useEffect(() => {
     if (editingId && renameInputRef.current) {
@@ -206,13 +218,13 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
           <div className="section-heading"><span>INSERTAR</span><span>01 — 05</span></div>
           <p className="section-description">Elige qué elemento agregar al lienzo.</p>
           <div className="insert-list">
-            <InsertCard icon="text" title="Texto" description="Títulos o párrafos" onClick={onInsertText} label="Añadir texto" />
-            <InsertCard icon="square" title="Rectángulo" description="Caja o tarjeta" onClick={onInsertRect} label="Añadir rectángulo" />
-            <InsertCard icon="circle" title="Círculo" description="Sello o insignia" onClick={onInsertCircle} label="Añadir círculo" />
-            <InsertCard icon="line" title="Línea" description="Separador o trazo" onClick={onInsertLine} label="Añadir línea" />
-            <InsertCard icon="image" title="Imagen" description="Sube un archivo" onClick={onInsertImage} label="Subir imagen" />
+            <InsertCard icon="text" title="Texto" description="Títulos o párrafos" onClick={onInsertText} label="Añadir texto" disabled={locked} />
+            <InsertCard icon="square" title="Rectángulo" description="Caja o tarjeta" onClick={onInsertRect} label="Añadir rectángulo" disabled={locked} />
+            <InsertCard icon="circle" title="Círculo" description="Sello o insignia" onClick={onInsertCircle} label="Añadir círculo" disabled={locked} />
+            <InsertCard icon="line" title="Línea" description="Separador o trazo" onClick={onInsertLine} label="Añadir línea" disabled={locked} />
+            <InsertCard icon="image" title="Imagen" description="Sube un archivo" onClick={onInsertImage} label="Subir imagen" disabled={locked} />
           </div>
-          <button type="button" className="image-url-link" onClick={onImageUrl} aria-label="Pegar URL de imagen" title="Pegar URL de imagen">
+          <button type="button" className="image-url-link" onClick={onImageUrl} aria-label="Pegar URL de imagen" title="Pegar URL de imagen" disabled={locked}>
             <Icon name="link" size={14} />
             <span>O pega una URL de imagen</span>
             <Icon name="arrowUpRight" size={13} />
@@ -300,8 +312,8 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
 
       {tab === 'datos' && (
         <div className="sheets-panel" data-testid="sheets-panel">
-          <div className="section-heading"><span>GOOGLE SHEETS</span><span>05 — 06</span></div>
-          <p className="section-description">Conecta una hoja pública de solo lectura, mapea columnas y previsualiza una fila.</p>
+          <div className="section-heading"><span>GOOGLE SHEETS</span><span>05 — 09</span></div>
+          <p className="section-description">Conecta una hoja pública de solo lectura, mapea columnas, previsualiza y genera un lote.</p>
 
           <label className="prop-sub-label" htmlFor="sheets-api-key">API key</label>
           <input
@@ -310,6 +322,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
             className="layer-rename-input"
             autoComplete="off"
             value={sheets.apiKey}
+            disabled={locked}
             onChange={(event) => setSheetsConfig({ apiKey: event.target.value })}
           />
 
@@ -320,6 +333,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
             className="layer-rename-input"
             placeholder="https://docs.google.com/spreadsheets/d/..."
             value={sheets.spreadsheetId}
+            disabled={locked}
             onChange={(event) => setSheetsConfig({ spreadsheetId: event.target.value })}
           />
 
@@ -332,6 +346,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 className="layer-rename-input"
                 placeholder="Hoja 1"
                 value={sheets.sheetName}
+                disabled={locked}
                 onChange={(event) => setSheetsConfig({ sheetName: event.target.value })}
               />
             </div>
@@ -342,6 +357,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 type="text"
                 className="layer-rename-input"
                 value={sheets.range}
+                disabled={locked}
                 onChange={(event) => setSheetsConfig({ range: event.target.value })}
               />
             </div>
@@ -350,7 +366,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
           <button
             type="button"
             className="image-url-link"
-            disabled={sheets.status === 'loading'}
+            disabled={sheets.status === 'loading' || locked}
             onClick={connectSheet}
           >
             <Icon name="link" size={14} />
@@ -389,6 +405,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                           className="layer-rename-input"
                           aria-label={`Campo para la columna ${header}`}
                           value={sheets.columnToField[header] ?? ''}
+                          disabled={locked}
                           onChange={(event) => mapColumnToField(header, event.target.value || null)}
                         >
                           <option value="">Sin mapear</option>
@@ -424,7 +441,65 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                 La fila seleccionada reemplaza temporalmente los campos en el lienzo; no cambia la plantilla.
               </p>
 
-              <button type="button" className="image-url-link" onClick={disconnectSheet}>
+              <div className="section-heading"><span>RENDER MASIVO</span><span>09</span></div>
+              <button
+                type="button"
+                className="image-url-link"
+                data-testid="generar-lote"
+                disabled={!puedeGenerarLote || generando}
+                onClick={onGenerarLote}
+              >
+                <Icon name="layers" size={14} />
+                <span>
+                  {generando
+                    ? `Generando ${loteEstado.actual}/${loteEstado.total}…`
+                    : `Generar ${sheets.rows.length} imágenes`}
+                </span>
+              </button>
+              {generando && (
+                <>
+                  <div className="layers-order-hint">
+                    <span>{loteEstado.actual} de {loteEstado.total}</span>
+                    <button type="button" className="layer-icon-btn is-danger" onClick={onCancelarLote} aria-label="Cancelar generación del lote" title="Cancelar">
+                      <Icon name="close" size={14} />
+                    </button>
+                  </div>
+                  <div
+                    style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,.12)', overflow: 'hidden' }}
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={loteEstado.total}
+                    aria-valuenow={loteEstado.actual}
+                  >
+                    <div
+                      style={{
+                        width: `${loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0}%`,
+                        height: '100%',
+                        background: '#7c5cff',
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+              {loteEstado.estado === 'listo' && (
+                <div className="layers-empty" role="status">
+                  <Icon name="check" size={20} />
+                  <strong>Lote descargado</strong>
+                  <p>
+                    {loteEstado.exitosos} imagen(es) generadas.
+                    {loteEstado.fallidos.length > 0 && ` Fallaron: fila ${loteEstado.fallidos.join(', fila ')}.`}
+                  </p>
+                </div>
+              )}
+              {loteEstado.estado === 'error' && (
+                <div className="layers-empty" role="alert">
+                  <Icon name="info" size={20} />
+                  <strong>No se pudo generar el lote</strong>
+                  <p>{loteEstado.error}</p>
+                </div>
+              )}
+
+              <button type="button" className="image-url-link" onClick={disconnectSheet} disabled={locked}>
                 <Icon name="close" size={14} />
                 <span>Desconectar hoja</span>
               </button>
@@ -446,17 +521,17 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
       {tab === 'capas' && (
         <div className="layers-panel" data-testid="layers-panel">
           <div className="layers-toolbar" role="toolbar" aria-label="Acciones de capas">
-            <button type="button" className="layer-tool-btn" aria-label="Enviar capa hacia el fondo" title="Enviar hacia el fondo (Ctrl+[)" disabled={!puedeBajar} onClick={moveSelectedBackward}>
+            <button type="button" className="layer-tool-btn" aria-label="Enviar capa hacia el fondo" title="Enviar hacia el fondo (Ctrl+[)" disabled={!puedeBajar || locked} onClick={moveSelectedBackward}>
               <Icon name="arrowUp" size={14} />
             </button>
-            <button type="button" className="layer-tool-btn" aria-label="Traer capa hacia el frente" title="Traer hacia el frente (Ctrl+])" disabled={!puedeSubir} onClick={moveSelectedForward}>
+            <button type="button" className="layer-tool-btn" aria-label="Traer capa hacia el frente" title="Traer hacia el frente (Ctrl+])" disabled={!puedeSubir || locked} onClick={moveSelectedForward}>
               <Icon name="arrowDown" size={14} />
             </button>
             <div className="layers-toolbar-sep" />
-            <button type="button" className="layer-tool-btn" aria-label="Duplicar capa" title="Duplicar (Ctrl+D)" disabled={!algunaDesbloqueada} onClick={duplicateSelected}>
+            <button type="button" className="layer-tool-btn" aria-label="Duplicar capa" title="Duplicar (Ctrl+D)" disabled={!algunaDesbloqueada || locked} onClick={duplicateSelected}>
               <Icon name="copy" size={14} />
             </button>
-            <button type="button" className="layer-tool-btn is-danger" aria-label="Eliminar capa" title="Eliminar (Supr)" disabled={!algunaDesbloqueada} onClick={deleteSelected}>
+            <button type="button" className="layer-tool-btn is-danger" aria-label="Eliminar capa" title="Eliminar (Supr)" disabled={!algunaDesbloqueada || locked} onClick={deleteSelected}>
               <Icon name="trash" size={14} />
             </button>
           </div>
@@ -481,7 +556,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                   <li
                     key={capa.id}
                     data-testid={`layer-item-${capa.id}`}
-                    draggable={!editando}
+                    draggable={!editando && !locked}
                     className={[
                       'layer-row',
                       seleccionada ? 'is-selected' : '',

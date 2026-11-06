@@ -110,16 +110,24 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     changeView({ x: point.x - worldX * newScale, y: point.y - worldY * newScale, scale: newScale });
   }, [changeView]);
 
-  const exportarPNG = useCallback(async ({ pixelRatio = 2 } = {}) => {
+  const renderizarPNG = useCallback(async ({ pixelRatio = 2 } = {}) => {
     const stage = stageRef.current;
     const currentCanvas = canvasRef.current;
     if (!stage || !currentCanvas) throw new Error('El lienzo aún no está listo.');
 
+    const vistaAnterior = {
+      x: stage.x(),
+      y: stage.y(),
+      scaleX: stage.scaleX(),
+      scaleY: stage.scaleY(),
+    };
+
+    // Renderiza siempre el lienzo completo en su origen, sin el zoom/pan del editor.
+    stage.setAttrs({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
     setExportando(true);
-    // Espera dos frames para que Konva aplique el estado de exportación sin guías.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     try {
-      const dataUrl = stage.toDataURL({
+      return stage.toDataURL({
         x: 0,
         y: 0,
         width: currentCanvas.width,
@@ -127,21 +135,28 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         pixelRatio: clamp(pixelRatio, 1, 4),
         mimeType: 'image/png',
       });
-      const base = String(projectName || 'plantilla').trim().replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'plantilla';
-      descargarDataUrl(dataUrl, `${base}.png`);
-      return dataUrl;
     } finally {
+      stage.setAttrs(vistaAnterior);
       setExportando(false);
+      stage.batchDraw();
     }
-  }, [projectName]);
+  }, []);
+
+  const exportarPNG = useCallback(async ({ pixelRatio = 2 } = {}) => {
+    const dataUrl = await renderizarPNG({ pixelRatio });
+    const base = String(projectName || 'plantilla').trim().replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'plantilla';
+    descargarDataUrl(dataUrl, `${base}.png`);
+    return dataUrl;
+  }, [projectName, renderizarPNG]);
 
   useImperativeHandle(ref, () => ({
     fitToScreen,
     exportarPNG,
+    renderizarPNG,
     zoom100: () => zoomAtPoint(1, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
     zoomIn: () => zoomAtPoint(viewRef.current.scale * 1.2, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
     zoomOut: () => zoomAtPoint(viewRef.current.scale / 1.2, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
-  }), [exportarPNG, fitToScreen, zoomAtPoint]);
+  }), [exportarPNG, fitToScreen, renderizarPNG, zoomAtPoint]);
 
   useLayoutEffect(() => {
     const holder = holderRef.current;
@@ -580,17 +595,19 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                     />
                   ))}
                 </Group>
-                <SelectionTransformer
-                  transformerRef={transformerRef}
-                  nodeRefs={nodeRefs}
-                  selectedIds={selectedIds}
-                  objects={capas}
-                  editingTextId={editingTextId}
-                  zoom={view.scale}
-                  onTransformStart={transformStart}
-                  onTransform={transform}
-                  onTransformEnd={transformEnd}
-                />
+                {!exportando && (
+                  <SelectionTransformer
+                    transformerRef={transformerRef}
+                    nodeRefs={nodeRefs}
+                    selectedIds={selectedIds}
+                    objects={capas}
+                    editingTextId={editingTextId}
+                    zoom={view.scale}
+                    onTransformStart={transformStart}
+                    onTransform={transform}
+                    onTransformEnd={transformEnd}
+                  />
+                )}
               </Layer>
               <Layer listening={false} visible={!exportando}>
                 <SmartGuides canvas={canvas} zoom={view.scale} smartGuides={smartGuides} />

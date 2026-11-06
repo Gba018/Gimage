@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import JSZip from 'jszip';
 import CanvasStage from './canvas/CanvasStage.jsx';
 import { cargarImagen } from './canvas/image-loader.js';
 import CropDialog from './components/CropDialog.jsx';
@@ -11,8 +12,11 @@ import TopBar from './panels/TopBar.jsx';
 import { useTemplateStore } from './state/template-store.js';
 import { descargarPlantilla } from './template/persistencia.js';
 import { dimensionesInicialesImagen } from './template/schema.js';
+import { valoresDeFila } from './sheets/mapper.js';
 
 const AUTOGUARDADO_MS = 800;
+const PAUSA_ENTRE_RENDERES_MS = 50;
+const TOKEN_IMAGEN = /\{\{\s*([\w.-]+)\s*\}\}/;
 
 function leerArchivo(file) {
   return new Promise((resolve, reject) => {
@@ -32,22 +36,56 @@ function leerArchivoTexto(file) {
   });
 }
 
+function descargarBlob(blob, nombreArchivo) {
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function precargarImagenesDeFila(indice) {
+  const state = useTemplateStore.getState();
+  const { sheets, fields, template } = state;
+  const fila = sheets.rows[indice];
+  if (!fila) return;
+  const valores = valoresDeFila(fila, sheets.headers, sheets.columnToField, fields);
+
+  await Promise.all(template.capas.filter((capa) => capa.tipo === 'imagen').map(async (capa) => {
+    const coincidencia = TOKEN_IMAGEN.exec(capa.imagen.src || '');
+    if (!coincidencia) return;
+    const valor = valores[coincidencia[1]] ?? fields[coincidencia[1]]?.defaultValue ?? '';
+    if (!valor) return;
+    try {
+      await cargarImagen(valor);
+    } catch {
+      // La fila se marcará como fallida si Konva no puede renderizar la imagen.
+    }
+  }));
+}
+
 export default function App() {
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const templateInputRef = useRef(null);
   const replaceLayerIdRef = useRef(null);
   const autoguardadoRef = useRef(null);
+  const cancelarLoteRef = useRef(false);
 
   const [zoom, setZoom] = useState(1);
   const [spacePressed, setSpacePressed] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [cropLayerId, setCropLayerId] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [loteEstado, setLoteEstado] = useState({ estado: 'idle', actual: 0, total: 0, exitosos: 0, fallidos: [], error: '' });
 
   const capas = useTemplateStore((state) => state.template.capas);
   const insertObject = useTemplateStore((state) => state.insertObject);
   const updateObject = useTemplateStore((state) => state.updateObject);
+  const generandoLote = loteEstado.estado === 'generando';
 
   const closeDialog = useCallback(() => {
     replaceLayerIdRef.current = null;
@@ -67,7 +105,6 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  // Fase 07: restaura el último autoguardado antes de suscribir cambios.
   useEffect(() => {
     const restaurado = useTemplateStore.getState().cargarDesdeNavegador();
     if (restaurado) {
@@ -75,7 +112,6 @@ export default function App() {
     }
   }, []);
 
-  // Fase 07: autoguardado con debounce ante cambios de plantilla o campos.
   useEffect(() => {
     const desuscribir = useTemplateStore.subscribe((state, anterior) => {
       const cambioRelevante = (
@@ -279,6 +315,66 @@ export default function App() {
     }
   };
 
+  const generarLote = async () => {
+    const state = useTemplateStore.getState();
+    const { sheets, template } = state;
+    if (sheets.status !== 'ready' || !sheets.rows.length || !Object.keys(sheets.columnToField).length) {
+      setLoteEstado({ estado: 'error', actual: 0, total: 0, exitosos: 0, fallidos: [], error: 'Conecta una hoja y mapea al menos una columna antes de generar.' });
+      return;
+    }
+
+    cancelarLoteRef.current = false;
+    const total = sheets.rows.length;
+    const filaActivaAnterior = sheets.activeRowIndex;
+    const zip = new JSZip();
+    const fallidos = [];
+    const base = String(template.nombre || 'plantilla').trim().replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'plantilla';
+
+    setLoteEstado({ estado: 'generando', actual: 0, total, exitosos: 0, fallidos: [], error: '' });
+
+    for (let indice = 0; indice < total; indice += 1) {
+      if (cancelarLoteRef.current) break;
+      useTemplateStore.getState().setActiveRowIndex(indice);
+      await precargarImagenesDeFila(indice);
+      await new Promise((resolve) => window.setTimeout(resolve, PAUSA_ENTRE_RENDERES_MS));
+      try {
+        const dataUrl = await canvasRef.current?.renderizarPNG({ pixelRatio: 2 });
+        if (!dataUrl) throw new Error('El lienzo no está disponible.');
+        zip.file(`${base}-${String(indice + 1).padStart(3, '0')}.png`, dataUrl.split(',')[1], { base64: true });
+        setLoteEstado((anterior) => ({ ...anterior, actual: indice + 1, exitosos: anterior.exitosos + 1 }));
+      } catch {
+        fallidos.push(indice + 1);
+        setLoteEstado((anterior) => ({ ...anterior, actual: indice + 1, fallidos: [...anterior.fallidos, indice + 1] }));
+      }
+    }
+
+    useTemplateStore.getState().setActiveRowIndex(filaActivaAnterior);
+
+    if (cancelarLoteRef.current) {
+      setLoteEstado({ estado: 'idle', actual: 0, total: 0, exitosos: 0, fallidos: [], error: '' });
+      setNotice({ type: 'warning', text: 'Generación del lote cancelada.' });
+      return;
+    }
+
+    if (fallidos.length < total) {
+      try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        descargarBlob(blob, `${base}-lote.zip`);
+        setLoteEstado({ estado: 'listo', actual: total, total, exitosos: total - fallidos.length, fallidos, error: '' });
+        return;
+      } catch (error) {
+        setLoteEstado({ estado: 'error', actual: total, total, exitosos: total - fallidos.length, fallidos, error: error.message || 'No se pudo crear el ZIP.' });
+        return;
+      }
+    }
+
+    setLoteEstado({ estado: 'error', actual: total, total, exitosos: 0, fallidos, error: 'Todas las filas fallaron; revisa las imágenes y permisos CORS.' });
+  };
+
+  const cancelarLote = () => {
+    cancelarLoteRef.current = true;
+  };
+
   const insertText = () => insertObject('texto');
   const insertRect = () => insertObject('rect');
   const insertCircle = () => insertObject('circulo');
@@ -306,6 +402,7 @@ export default function App() {
     <div className="app-shell">
       <TopBar
         zoom={zoom}
+        disabled={generandoLote}
         onZoomIn={() => canvasRef.current?.zoomIn()}
         onZoomOut={() => canvasRef.current?.zoomOut()}
         onZoom100={() => canvasRef.current?.zoom100()}
@@ -331,6 +428,10 @@ export default function App() {
             replaceLayerIdRef.current = null;
             setDialog('image');
           }}
+          onGenerarLote={generarLote}
+          onCancelarLote={cancelarLote}
+          loteEstado={loteEstado}
+          locked={generandoLote}
         />
         <CanvasStage
           ref={canvasRef}

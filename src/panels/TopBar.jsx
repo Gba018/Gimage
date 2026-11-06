@@ -4,6 +4,7 @@ import { useTemplateStore } from '../state/template-store.js';
 
 export default function TopBar({
   zoom,
+  disabled = false,
   onZoomIn,
   onZoomOut,
   onZoom100,
@@ -39,6 +40,7 @@ export default function TopBar({
           aria-label="Nombre del proyecto"
           className="project-name-input"
           value={nombre}
+          disabled={disabled}
           onChange={(event) => setName(event.target.value)}
           onBlur={() => { if (!nombre.trim()) setName('Proyecto sin título'); }}
         />
@@ -48,43 +50,29 @@ export default function TopBar({
       </div>
 
       <div className="history-group" aria-label="Historial">
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Deshacer"
-          title="Deshacer (Ctrl+Z)"
-          disabled={!canUndo}
-          onClick={undo}
-        >
+        <button type="button" className="icon-button" aria-label="Deshacer" title="Deshacer (Ctrl+Z)" disabled={!canUndo || disabled} onClick={undo}>
           <Icon name="undo" size={16} />
         </button>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Rehacer"
-          title="Rehacer (Ctrl+Y)"
-          disabled={!canRedo}
-          onClick={redo}
-        >
+        <button type="button" className="icon-button" aria-label="Rehacer" title="Rehacer (Ctrl+Y)" disabled={!canRedo || disabled} onClick={redo}>
           <Icon name="redo" size={16} />
         </button>
       </div>
 
       <div className="topbar-spacer" />
       <div className="quick-insert" aria-label="Insertar objeto">
-        <button className="quick-insert-button" type="button" onClick={onInsertText} aria-label="Insertar texto" title="Insertar texto">
+        <button className="quick-insert-button" type="button" disabled={disabled} onClick={onInsertText} aria-label="Insertar texto" title="Insertar texto">
           <Icon name="text" size={16} /><span>Texto</span>
         </button>
-        <button className="quick-insert-button" type="button" onClick={onInsertRect} aria-label="Insertar rectángulo" title="Insertar rectángulo">
+        <button className="quick-insert-button" type="button" disabled={disabled} onClick={onInsertRect} aria-label="Insertar rectángulo" title="Insertar rectángulo">
           <Icon name="square" size={16} /><span>Rect</span>
         </button>
-        <button className="quick-insert-button" type="button" onClick={onInsertCircle} aria-label="Insertar círculo" title="Insertar círculo">
+        <button className="quick-insert-button" type="button" disabled={disabled} onClick={onInsertCircle} aria-label="Insertar círculo" title="Insertar círculo">
           <Icon name="circle" size={16} /><span>Círculo</span>
         </button>
-        <button className="quick-insert-button" type="button" onClick={onInsertLine} aria-label="Insertar línea" title="Insertar línea">
+        <button className="quick-insert-button" type="button" disabled={disabled} onClick={onInsertLine} aria-label="Insertar línea" title="Insertar línea">
           <Icon name="line" size={16} /><span>Línea</span>
         </button>
-        <button className="quick-insert-button" type="button" onClick={onInsertImage} aria-label="Insertar imagen desde archivo" title="Insertar imagen desde archivo">
+        <button className="quick-insert-button" type="button" disabled={disabled} onClick={onInsertImage} aria-label="Insertar imagen desde archivo" title="Insertar imagen desde archivo">
           <Icon name="image" size={16} /><span>Imagen</span>
         </button>
       </div>
@@ -97,17 +85,17 @@ export default function TopBar({
         <button type="button" className="icon-button fit-button" onClick={onFit} aria-label="Ajustar a pantalla" title="Ajustar a pantalla"><Icon name="fit" size={17} /></button>
       </div>
       <div className="project-actions" aria-label="Guardar, abrir y exportar">
-        <button type="button" className="icon-button" onClick={onOpenTemplate} aria-label="Abrir plantilla JSON" title="Abrir plantilla JSON">
+        <button type="button" className="icon-button" disabled={disabled} onClick={onOpenTemplate} aria-label="Abrir plantilla JSON" title="Abrir plantilla JSON">
           <Icon name="folder" size={16} />
         </button>
-        <button type="button" className="icon-button" onClick={onSaveTemplate} aria-label="Guardar plantilla como archivo JSON" title="Guardar plantilla como archivo JSON">
+        <button type="button" className="icon-button" disabled={disabled} onClick={onSaveTemplate} aria-label="Guardar plantilla como archivo JSON" title="Guardar plantilla como archivo JSON">
           <Icon name="download" size={16} />
         </button>
-        <button type="button" className="icon-button" onClick={onExportPng} aria-label="Exportar lienzo como PNG" title="Exportar lienzo como PNG (2x)">
+        <button type="button" className="icon-button" disabled={disabled} onClick={onExportPng} aria-label="Exportar lienzo como PNG" title="Exportar lienzo como PNG (2x)">
           <Icon name="image" size={16} />
         </button>
       </div>
-      <button type="button" className="new-project-button" onClick={onNewProject} aria-label="Nuevo proyecto">
+      <button type="button" className="new-project-button" disabled={disabled} onClick={onNewProject} aria-label="Nuevo proyecto">
         <Icon name="plus" size={16} /><span>Nuevo proyecto</span>
       </button>
     </header>
