@@ -76,6 +76,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const capas = template.capas;
   const campoSeleccionado = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
+  const sinConexion = sheets.status === 'idle' || sheets.status === 'disconnected';
 
   useEffect(() => {
     function actualizar() { connectSheet().catch(() => {}); }
@@ -161,7 +162,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
         {pestana === 'datos' && (
           <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2 className="gp-title">Datos</h2>
-            {sheets.status === 'disconnected' && (
+            {sinConexion && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <p className="gp-hint">Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
                 <input className="gp-input" value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
@@ -220,7 +221,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
           <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h2 className="gp-title">Capas</h2>
             <p className="gp-hint">Selecciona, renombra, oculta, bloquea o reordena los elementos.</p>
-            {[...capas].map((capa) => (
+            {capas.map((capa) => (
               <div key={capa.id} className={`gp-layer ${selectedIds.includes(capa.id) ? 'is-selected' : ''}`}>
                 <button type="button" className="gp-icon-btn" title={capa.visible ? 'Ocultar' : 'Mostrar'} onClick={() => toggleLayerVisible(capa.id)}>{capa.visible ? '👁' : '🚫'}</button>
                 <button type="button" className="gp-icon-btn" title={capa.bloqueada ? 'Desbloquear' : 'Bloquear'} onClick={() => toggleLayerLocked(capa.id)}>{capa.bloqueada ? '🔓' : '🔒'}</button>
