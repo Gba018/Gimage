@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icons.jsx';
 import { useTemplateStore } from '../state/template-store.js';
-import { normalizarNombreCampo } from '../template/fields.js';
+import { extraerCamposPlantilla, normalizarNombreCampo } from '../template/fields.js';
+import { valoresDeFila } from '../sheets/mapper.js';
 import GoogleSheetsConnector from './GoogleSheetsConnector.jsx';
 
 const PESTANAS = [
@@ -50,6 +51,15 @@ const ESTILOS = `
 .gp-shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .gp-shape{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:10px;border:1px solid #1e293b;background:#111c2e;color:#cbd5f5;font-size:11px;cursor:pointer;}
 .gp-shape:hover:not(:disabled){background:#1e293b;}
+.gp-nav{display:flex;align-items:center;gap:6px;padding:6px;border:1px solid #1e293b;border-radius:10px;background:#111c2e;}
+.gp-nav-label{flex:1;text-align:center;font-size:11px;font-weight:700;color:#e2e8f0;font-variant-numeric:tabular-nums;}
+.gp-thumbs{display:flex;gap:4px;overflow-x:auto;padding:4px 2px;}
+.gp-thumb{width:46px;height:34px;flex-shrink:0;border-radius:6px;border:1px solid #1e293b;background:#0b1220;display:grid;place-items:center;color:#64748b;cursor:pointer;padding:0;overflow:hidden;}
+.gp-thumb.is-active{border-color:#0ea5e9;box-shadow:0 0 0 1px rgba(14,165,233,.5);}
+.gp-thumb img{width:100%;height:100%;object-fit:cover;}
+.gp-preview{display:flex;flex-direction:column;gap:6px;}
+.gp-preview-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cbd5f5;}
+.gp-preview-row strong{color:#7dd3fc;font-weight:600;}
 `;
 
 export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, onActualizarDatos, loteEstado, locked }) {
@@ -70,10 +80,56 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
   const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
   const reorderLayer = useTemplateStore((state) => state.reorderLayer);
-  const campos = useMemo(() => Object.values(fields), [fields]);
   const capas = template.capas;
+  const campos = useMemo(() => Object.values(fields), [fields]);
+  const camposDetectados = useMemo(() => extraerCamposPlantilla({ capas }), [capas]);
+  const nombresCampos = useMemo(() => {
+    const nombres = new Set(camposDetectados.map((campo) => campo.nombre));
+    Object.keys(fields).forEach((nombre) => nombres.add(nombre));
+    return Array.from(nombres);
+  }, [camposDetectados, fields]);
   const campoSeleccionado = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
+  const indiceActivo = sheets.activeRowIndex ?? 0;
+  const filaActiva = sheets.activeRowIndex != null ? sheets.rows[sheets.activeRowIndex] : null;
+  const valoresFilaActiva = useMemo(
+    () => (filaActiva ? valoresDeFila(filaActiva, sheets.headers, sheets.columnToField, fields) : {}),
+    [filaActiva, sheets.headers, sheets.columnToField, fields],
+  );
+  const miniaturas = useMemo(() => {
+    const total = sheets.rows.length;
+    if (!total) return [];
+    const activo = sheets.activeRowIndex ?? 0;
+    const inicio = Math.max(0, Math.min(activo - 6, Math.max(0, total - 12)));
+    const fin = Math.min(total, inicio + 12);
+    return Array.from({ length: fin - inicio }, (_, offset) => {
+      const indice = inicio + offset;
+      const valores = valoresDeFila(sheets.rows[indice], sheets.headers, sheets.columnToField, fields);
+      const campoImagen = camposDetectados.find((campo) => campo.tipo === 'imagen' && valores[campo.nombre]);
+      return { indice, url: campoImagen ? String(valores[campoImagen.nombre]) : '', etiqueta: `Fila ${indice + 1}` };
+    });
+  }, [sheets.rows, sheets.activeRowIndex, sheets.headers, sheets.columnToField, fields, camposDetectados]);
+
+  useEffect(() => {
+    if (sheets.status === 'ready' && sheets.rows.length && sheets.activeRowIndex == null) setActiveRowIndex(0);
+  }, [sheets.status, sheets.rows.length, sheets.activeRowIndex, setActiveRowIndex]);
+
+  function irAFila(indice) {
+    if (locked || indice < 0 || indice >= sheets.rows.length) return;
+    setActiveRowIndex(indice);
+  }
+
+  useEffect(() => {
+    if (pestana !== 'datos' || locked || !sheets.rows.length) return undefined;
+    function keydown(event) {
+      const target = event.target;
+      if (target instanceof HTMLElement && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+      if (event.key === 'ArrowLeft') { event.preventDefault(); irAFila(indiceActivo - 1); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); irAFila(indiceActivo + 1); }
+    }
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [pestana, locked, sheets.rows.length, indiceActivo]);
 
   function agregarCampo(event) {
     event.preventDefault();
@@ -161,17 +217,34 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                       <span>{columna}</span>
                       <select className="gp-select" value={sheets.columnToField[columna] ?? ''} onChange={(event) => setColumnField(columna, event.target.value)}>
                         <option value="">Sin mapear</option>
-                        {campos.map((campo) => <option key={campo.nombre} value={campo.nombre}>{`[${campo.nombre}]`}</option>)}
+                        {nombresCampos.map((nombre) => <option key={nombre} value={nombre}>{`[${nombre}]`}</option>)}
                       </select>
                     </label>
                   ))}
                 </div>
-                <label className="gp-map-row">
-                  <span>Fila activa</span>
-                  <select className="gp-select" value={sheets.activeRowIndex} onChange={(event) => setActiveRowIndex(Number(event.target.value))}>
-                    {sheets.rows.map((_, indice) => <option key={indice} value={indice}>{indice + 1}</option>)}
-                  </select>
-                </label>
+                <div className="gp-nav">
+                  <button type="button" className="gp-icon-btn" title="Fila anterior (←)" disabled={locked || indiceActivo <= 0} onClick={() => irAFila(indiceActivo - 1)}>←</button>
+                  <span className="gp-nav-label">Fila {indiceActivo + 1} de {sheets.rows.length}</span>
+                  <button type="button" className="gp-icon-btn" title="Fila siguiente (→)" disabled={locked || indiceActivo >= sheets.rows.length - 1} onClick={() => irAFila(indiceActivo + 1)}>→</button>
+                </div>
+                <div className="gp-thumbs" role="listbox" aria-label="Miniaturas de filas">
+                  {miniaturas.map((miniatura) => (
+                    <button key={miniatura.indice} type="button" role="option" aria-selected={miniatura.indice === indiceActivo} className={`gp-thumb ${miniatura.indice === indiceActivo ? 'is-active' : ''}`} title={miniatura.etiqueta} disabled={locked} onClick={() => irAFila(miniatura.indice)}>
+                      {miniatura.url ? <img src={miniatura.url} alt="" /> : <Icon name="image" size={14} />}
+                    </button>
+                  ))}
+                </div>
+                {filaActiva && (
+                  <div className="gp-card gp-preview">
+                    <div className="gp-card-head"><strong>Vista previa</strong><span className="gp-badge">Fila {indiceActivo + 1}</span></div>
+                    {nombresCampos.map((nombre) => (
+                      <div key={nombre} className="gp-preview-row">
+                        <strong>{`[${nombre}]`}</strong>
+                        <span>{String(valoresFilaActiva[nombre] ?? '') || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <button type="button" className="gp-btn" onClick={onActualizarDatos}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
                 <button type="button" className="gp-btn primary" onClick={onGenerarLote} disabled={locked}><Icon name="download" size={16} /><span>Generar lote</span></button>
               </div>
