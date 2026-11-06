@@ -127,6 +127,29 @@ export const useTemplateStore = create((set, get) => {
       if (!Object.keys(cambios).length) return null;
       return { template:{ ...state.template, capas:state.template.capas.map((capa) => (cambios[capa.id] ? { ...capa, ...cambios[capa.id] } : capa)) } };
     }),
+    flipSelected:(eje) => aplicarCambio((state) => {
+      const clave = eje === 'vertical' ? 'flipY' : 'flipX';
+      let cambio = false;
+      const capas = state.template.capas.map((capa) => {
+        if (!state.selectedIds.includes(capa.id) || !capa.visible || capa.bloqueada) return capa;
+        cambio = true;
+        return { ...capa, [clave]: !capa[clave] };
+      });
+      return cambio ? { template:{ ...state.template, capas } } : null;
+    }),
+    duplicateLayerAt:(id, x, y) => {
+      const state = get();
+      const capa = state.template.capas.find((item) => item.id === id);
+      if (!capa || capa.bloqueada) return null;
+      const ids = state.template.capas.map((item) => item.id);
+      const copia = clonar(capa);
+      copia.id = crearIdCapa(ids);
+      copia.nombre = `${capa.nombre} copia`;
+      copia.x = Math.round(x);
+      copia.y = Math.round(y);
+      aplicarCambio((actual) => ({ template:{ ...actual.template, capas:[...actual.template.capas, copia] }, selectedIds:[copia.id] }));
+      return copia.id;
+    },
     updateObject:(id, cambios, opciones = {}) => aplicarCambio((state) => { let huboCambio = false; const capas = state.template.capas.map((capa) => { if (capa.id !== id) return capa; huboCambio = true; let actualizada = { ...capa, ...cambios }; if (capa.tipo && cambios[capa.tipo]) actualizada[capa.tipo] = { ...capa[capa.tipo], ...cambios[capa.tipo] }; if (actualizada.tipo === 'texto') actualizada = normalizarCapaTextoConCaja(actualizada, cambios.texto?.caja || null, state.fields); return actualizada; }); if (!huboCambio) return null; const siguienteSeleccion = cambios.bloqueada === true ? state.selectedIds.filter((selId) => selId !== id) : state.selectedIds; return { template:{ ...state.template, capas }, selectedIds:siguienteSeleccion }; }, { historyKey:opciones.historyKey ?? null }),
     updateTextBox:(id, parcial, opciones = {}) => aplicarCambio((state) => { const existe = state.template.capas.some((capa) => capa.id === id && capa.tipo === 'texto'); if (!existe) return null; const capas = state.template.capas.map((capa) => (capa.id === id ? normalizarCapaTextoConCaja(capa, parcial, state.fields) : capa)); return { template:{ ...state.template, capas } }; }, { historyKey:opciones.historyKey ?? null }),
     reapplyAutoFitForFont:(familia, opciones = {}) => aplicarCambio((state) => { const objetivo = String(familia ?? '').trim().toLowerCase(); if (!objetivo) return null; let huboAjuste = false; const capas = state.template.capas.map((capa) => { if (capa.tipo !== 'texto' || String(capa.texto?.fontFamily ?? '').trim().toLowerCase() !== objetivo) return capa; const caja = obtenerCajaTexto(capa); if (!caja?.autoFit) return capa; const ajustada = normalizarCapaTextoConCaja(capa, null, state.fields); if (ajustada.texto.fontSize !== capa.texto.fontSize) huboAjuste = true; return ajustada.texto.fontSize !== capa.texto.fontSize ? ajustada : capa; }); return huboAjuste ? { template:{ ...state.template, capas } } : null; }, { historyKey:opciones.historyKey ?? null }),

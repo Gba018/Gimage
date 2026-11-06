@@ -3,7 +3,7 @@ import { Circle, Group, Image as KonvaImage, Line, Rect, Text } from 'react-konv
 import { cargarGoogleFont, estadoGoogleFont, suscribirFuentes } from './font-loader.js';
 import { cargarImagen } from './image-loader.js';
 import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
-import { DEFAULT_TEXT_BOX, konvaFillProps, normalizarStroke } from '../template/schema.js';
+import { DEFAULT_TEXT_BOX, clamp, konvaFillProps, normalizarStroke } from '../template/schema.js';
 import { esCampoImagen, resolverImagenSrc, resolverTexto } from '../template/fields.js';
 
 function usarImagen(src) {
@@ -33,6 +33,7 @@ export default function CanvasObject({
   fieldsPreview = null,
 }) {
   const selectObject = useTemplateStore((state) => state.selectObject);
+  const updateObject = useTemplateStore((state) => state.updateObject);
   const reapplyAutoFitForFont = useTemplateStore((state) => state.reapplyAutoFitForFont);
   const fields = useTemplateStore((state) => state.fields);
   const isSelected = useTemplateStore((state) => state.selectedIds.includes(object.id));
@@ -164,6 +165,8 @@ export default function CanvasObject({
     rotation: object.rotation,
     opacity: object.opacity,
     visible: object.visible,
+    scaleX: object.flipX ? -1 : 1,
+    scaleY: object.flipY ? -1 : 1,
     listening: !object.bloqueada,
     draggable: !object.bloqueada && !panMode && !isEditing,
     onMouseDown: select,
@@ -172,7 +175,7 @@ export default function CanvasObject({
     onDblTap: editText,
     onDragStart: (event) => onDragStart(object.id, event),
     onDragMove: () => onDragMove(object.id),
-    onDragEnd: () => onDragEnd(object.id),
+    onDragEnd: (event) => onDragEnd(object.id, event),
     onMouseEnter: (event) => {
       if (!panMode && !object.bloqueada && !isEditing) {
         event.target.getStage().container().style.cursor = 'move';
@@ -292,12 +295,16 @@ export default function CanvasObject({
   }
 
   if (object.tipo === 'imagen') {
+    const frameW = object.imagen.width;
+    const frameH = object.imagen.height;
+    const ajuste = object.imagen.ajuste ?? 'llenar';
+
     if (imagenDinamica && !image) {
       return (
         <Rect
           {...common}
-          width={object.imagen.width}
-          height={object.imagen.height}
+          width={frameW}
+          height={frameH}
           fill="#eef1f4"
           stroke="#9ca3af"
           strokeWidth={2}
@@ -306,12 +313,74 @@ export default function CanvasObject({
       );
     }
 
+    if (ajuste === 'ajustar' && image) {
+      const escala = Math.min(frameW / image.naturalWidth, frameH / image.naturalHeight);
+      const ancho = image.naturalWidth * escala;
+      const alto = image.naturalHeight * escala;
+      return (
+        <Group
+          {...common}
+          width={frameW}
+          height={frameH}
+          clipX={0}
+          clipY={0}
+          clipWidth={frameW}
+          clipHeight={frameH}
+        >
+          <KonvaImage
+            x={(frameW - ancho) / 2}
+            y={(frameH - alto) / 2}
+            width={ancho}
+            height={alto}
+            image={image}
+            listening={false}
+          />
+        </Group>
+      );
+    }
+
+    let crop;
+    if (image) {
+      const aspectoMarco = frameW / frameH;
+      const aspectoImagen = image.naturalWidth / image.naturalHeight;
+      let cropW;
+      let cropH;
+      if (aspectoImagen > aspectoMarco) {
+        cropH = image.naturalHeight;
+        cropW = cropH * aspectoMarco;
+      } else {
+        cropW = image.naturalWidth;
+        cropH = cropW / aspectoMarco;
+      }
+      const rangoX = Math.max(0, image.naturalWidth - cropW);
+      const rangoY = Math.max(0, image.naturalHeight - cropH);
+      const proporcionX = ajuste === 'recortar' ? clamp(object.imagen.offsetX ?? 0.5, 0, 1) : 0.5;
+      const proporcionY = ajuste === 'recortar' ? clamp(object.imagen.offsetY ?? 0.5, 0, 1) : 0.5;
+      crop = { x: proporcionX * rangoX, y: proporcionY * rangoY, width: cropW, height: cropH };
+    }
+
+    function recorteDragEnd(event) {
+      const nodo = event.target;
+      const dx = nodo.x() - object.x;
+      const dy = nodo.y() - object.y;
+      nodo.position({ x: object.x, y: object.y });
+      nodo.getLayer()?.batchDraw();
+      if ((!dx && !dy) || !image || !crop) return;
+      const rangoX = Math.max(1, image.naturalWidth - crop.width);
+      const rangoY = Math.max(1, image.naturalHeight - crop.height);
+      const siguienteX = clamp((object.imagen.offsetX ?? 0.5) - (dx * (crop.width / frameW)) / rangoX, 0, 1);
+      const siguienteY = clamp((object.imagen.offsetY ?? 0.5) - (dy * (crop.height / frameH)) / rangoY, 0, 1);
+      updateObject(object.id, { imagen: { ...object.imagen, offsetX: siguienteX, offsetY: siguienteY } });
+    }
+
     return (
       <KonvaImage
         {...common}
-        width={object.imagen.width}
-        height={object.imagen.height}
+        width={frameW}
+        height={frameH}
         image={image}
+        crop={crop}
+        onDragEnd={ajuste === 'recortar' ? recorteDragEnd : common.onDragEnd}
         stroke={imagenDinamica && isSelected ? '#7c5cff' : undefined}
         strokeWidth={imagenDinamica && isSelected ? 2 : 0}
         dash={imagenDinamica && isSelected ? [6, 4] : undefined}
