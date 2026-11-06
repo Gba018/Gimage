@@ -50,10 +50,7 @@ function cargarMapeo(spreadsheetId, sheetName) {
 
 function guardarMapeo(spreadsheetId, sheetName, mapeo) {
   try {
-    localStorage.setItem(claveMapeo(spreadsheetId, sheetName), JSON.stringify({
-      version: 1,
-      columnToField: mapeo,
-    }));
+    localStorage.setItem(claveMapeo(spreadsheetId, sheetName), JSON.stringify({ version: 1, columnToField: mapeo }));
   } catch { /* almacenamiento no disponible */ }
 }
 
@@ -165,6 +162,19 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     const valor = primerCampoTexto ? (valoresDeFila(fila, sheets.headers, sheets.columnToField, fields)[primerCampoTexto.nombre] ?? '') : '';
     return valor ? String(valor).slice(0, 32) : `Fila ${indice + 1}`;
   }, [sheets.activeRowIndex, sheets.rows, sheets.headers, sheets.columnToField, fields, camposDetectados]);
+  const miniaturas = useMemo(() => {
+    const total = sheets.rows.length;
+    if (!total) return [];
+    const activo = sheets.activeRowIndex ?? 0;
+    const inicio = Math.max(0, Math.min(activo - 6, Math.max(0, total - 12)));
+    const fin = Math.min(total, inicio + 12);
+    return Array.from({ length: fin - inicio }, (_, offset) => {
+      const indice = inicio + offset;
+      const valores = valoresDeFila(sheets.rows[indice], sheets.headers, sheets.columnToField, fields);
+      const campoImagen = camposDetectados.find((campo) => campo.tipo === 'imagen' && valores[campo.nombre]);
+      return { indice, url: campoImagen ? String(valores[campoImagen.nombre]) : '', etiqueta: `Fila ${indice + 1}` };
+    });
+  }, [sheets.rows, sheets.activeRowIndex, sheets.headers, sheets.columnToField, fields, camposDetectados]);
 
   useEffect(() => {
     if (editingId && renameInputRef.current) {
@@ -177,6 +187,27 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
     const timer = window.setTimeout(() => setBusquedaColumna(busquedaDraft), 180);
     return () => window.clearTimeout(timer);
   }, [busquedaDraft]);
+
+  useEffect(() => {
+    if (sheets.status === 'ready' && sheets.rows.length && sheets.activeRowIndex == null) setActiveRowIndex(0);
+  }, [sheets.status, sheets.rows.length, sheets.activeRowIndex, setActiveRowIndex]);
+
+  function irAFila(indice) {
+    if (locked || indice < 0 || indice >= sheets.rows.length) return;
+    setActiveRowIndex(indice);
+  }
+
+  useEffect(() => {
+    if (tab !== 'datos' || locked || !sheets.rows.length) return undefined;
+    function keydown(event) {
+      const target = event.target;
+      if (target instanceof HTMLElement && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+      if (event.key === 'ArrowLeft') { event.preventDefault(); irAFila((sheets.activeRowIndex ?? 0) - 1); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); irAFila((sheets.activeRowIndex ?? 0) + 1); }
+    }
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [tab, locked, sheets.rows.length, sheets.activeRowIndex]);
 
   useEffect(() => {
     if (sheets.status !== 'ready' || !sheets.spreadsheetId || !sheets.sheetName || !sheets.headers.length) return;
@@ -232,6 +263,9 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const algunaDesbloqueada = capas.some((capa) => selectedIds.includes(capa.id) && !capa.bloqueada);
   const puedeBajar = haySeleccion && capas.some((capa, idx) => idx > 0 && selectedIds.includes(capa.id) && !selectedIds.includes(capas[idx - 1].id));
   const puedeSubir = haySeleccion && capas.some((capa, idx) => idx < capas.length - 1 && selectedIds.includes(capa.id) && !selectedIds.includes(capas[idx + 1].id));
+  const indiceActivo = sheets.activeRowIndex ?? 0;
+  const estiloNavBtn = { width: 28, height: 28, border: '1px solid #34483b', borderRadius: 6, background: '#24352b', color: '#d5e4d4', display: 'grid', placeItems: 'center', padding: 0 };
+  const estiloThumb = { width: 46, height: 34, borderRadius: 5, border: '1px solid #34483b', background: '#141f19', overflow: 'hidden', flexShrink: 0, padding: 0, display: 'grid', placeItems: 'center', color: '#7f9483' };
 
   return (
     <aside className="sidebar" aria-label="Herramientas, campos, datos y capas">
@@ -329,11 +363,18 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
               )}
 
               <div className="section-heading"><span>VISTA PREVIA</span><span>06</span></div>
-              <label className="prop-sub-label" htmlFor="sheets-preview-row">Fila activa</label>
-              <select id="sheets-preview-row" className="layer-rename-input" data-testid="sheets-preview-row" value={sheets.activeRowIndex ?? ''} onChange={(event) => setActiveRowIndex(event.target.value === '' ? null : Number(event.target.value))}>
-                <option value="">Sin vista previa</option>
-                {sheets.rows.map((_, indice) => (<option key={indice} value={indice}>{`Fila ${indice + 1}`}</option>))}
-              </select>
+              <div className="row-navigator" data-testid="sheets-preview-row" role="group" aria-label="Navegador de filas" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 5, border: '1px solid #2b3c31', borderRadius: 8, background: '#131d18' }}>
+                <button type="button" style={{ ...estiloNavBtn }} aria-label="Fila anterior" title="Fila anterior (←)" disabled={locked || indiceActivo <= 0} onClick={() => irAFila(indiceActivo - 1)}><span style={{ display: 'grid', transform: 'rotate(-90deg)' }}><Icon name="arrowUp" size={14} /></span></button>
+                <span style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#e6f0e5', fontVariantNumeric: 'tabular-nums' }}>{`Fila ${indiceActivo + 1} de ${sheets.rows.length}`}</span>
+                <button type="button" style={{ ...estiloNavBtn }} aria-label="Fila siguiente" title="Fila siguiente (→)" disabled={locked || indiceActivo >= sheets.rows.length - 1} onClick={() => irAFila(indiceActivo + 1)}><span style={{ display: 'grid', transform: 'rotate(90deg)' }}><Icon name="arrowUp" size={14} /></span></button>
+              </div>
+              <div className="row-thumb-strip" role="listbox" aria-label="Miniaturas de filas" style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '6px 2px', scrollbarWidth: 'thin' }}>
+                {miniaturas.map((miniatura) => (
+                  <button key={miniatura.indice} type="button" role="option" aria-selected={miniatura.indice === indiceActivo} aria-label={miniatura.etiqueta} title={miniatura.etiqueta} disabled={locked} onClick={() => irAFila(miniatura.indice)} style={{ ...estiloThumb, borderColor: miniatura.indice === indiceActivo ? '#9ed36c' : '#34483b', boxShadow: miniatura.indice === indiceActivo ? '0 0 0 1px rgba(185,232,120,.45)' : 'none' }}>
+                    {miniatura.url ? <img src={miniatura.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="image" size={14} />}
+                  </button>
+                ))}
+              </div>
               {filaActiva && (
                 <div className="sheets-preview-card" data-testid="sheets-preview-card">
                   {miniaturaActiva && <img className="sheets-preview-thumb" src={miniaturaActiva} alt={`Miniatura de ${campoImagenActivo.nombre}`} />}
@@ -344,7 +385,7 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
                   </div>
                 </div>
               )}
-              <p className="section-description">La fila seleccionada reemplaza temporalmente los campos en el lienzo; no cambia la plantilla.</p>
+              <p className="section-description">La fila seleccionada reemplaza temporalmente los campos en el lienzo; no cambia la plantilla. Usa ← y → para navegar.</p>
 
               <div className="section-heading"><span>RENDER MASIVO</span><span>09</span></div>
               <button type="button" className="image-url-link" data-testid="generar-lote" disabled={!puedeGenerarLote || generando} onClick={onGenerarLote}><Icon name="layers" size={14} /><span>{generando ? `Generando ${loteEstado.actual}/${loteEstado.total}…` : `Generar ${sheets.rows.length} imágenes`}</span></button>
