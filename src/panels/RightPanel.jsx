@@ -20,7 +20,6 @@ const ETIQUETA_TIPO = {
   rect: 'Rectángulo',
   circulo: 'Círculo',
   linea: 'Línea',
-  texto: 'Texto',
   imagen: 'Imagen',
 };
 
@@ -287,27 +286,11 @@ export default function RightPanel({
         <div className="prop-grid-2">
           <div>
             <span className="prop-mini-label">Posición X</span>
-            <NumericInput
-              value={selectedLayer.x}
-              step={1}
-              decimals={0}
-              suffix="px"
-              ariaLabel="Posición X"
-              disabled={bloqueada}
-              onChange={(x) => cambiarComun({ x }, `layer:${id}:x`)}
-            />
+            <NumericInput value={selectedLayer.x} step={1} decimals={0} suffix="px" ariaLabel="Posición X" disabled={bloqueada} onChange={(x) => cambiarComun({ x }, `layer:${id}:x`)} />
           </div>
           <div>
             <span className="prop-mini-label">Posición Y</span>
-            <NumericInput
-              value={selectedLayer.y}
-              step={1}
-              decimals={0}
-              suffix="px"
-              ariaLabel="Posición Y"
-              disabled={bloqueada}
-              onChange={(y) => cambiarComun({ y }, `layer:${id}:y`)}
-            />
+            <NumericInput value={selectedLayer.y} step={1} decimals={0} suffix="px" ariaLabel="Posición Y" disabled={bloqueada} onChange={(y) => cambiarComun({ y }, `layer:${id}:y`)} />
           </div>
         </div>
 
@@ -315,31 +298,11 @@ export default function RightPanel({
           <div className="prop-grid-2 prop-mt">
             <div>
               <span className="prop-mini-label">Ancho (W)</span>
-              <NumericInput
-                value={selectedLayer.rect.width}
-                min={1}
-                max={10000}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Ancho"
-                disabled={bloqueada}
-                onChange={(width) => cambiarSubtipo({ width }, `layer:${id}:w`)}
-              />
+              <NumericInput value={selectedLayer.rect.width} min={1} max={10000} step={1} decimals={0} suffix="px" ariaLabel="Ancho" disabled={bloqueada} onChange={(width) => cambiarSubtipo({ width }, `layer:${id}:w`)} />
             </div>
             <div>
               <span className="prop-mini-label">Alto (H)</span>
-              <NumericInput
-                value={selectedLayer.rect.height}
-                min={1}
-                max={10000}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Alto"
-                disabled={bloqueada}
-                onChange={(height) => cambiarSubtipo({ height }, `layer:${id}:h`)}
-              />
+              <NumericInput value={selectedLayer.rect.height} min={1} max={10000} step={1} decimals={0} suffix="px" ariaLabel="Alto" disabled={bloqueada} onChange={(height) => cambiarSubtipo({ height }, `layer:${id}:h`)} />
             </div>
           </div>
         )}
@@ -348,17 +311,7 @@ export default function RightPanel({
           <div className="prop-grid-2 prop-mt">
             <div>
               <span className="prop-mini-label">Radio</span>
-              <NumericInput
-                value={selectedLayer.circulo.radius}
-                min={1}
-                max={5000}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Radio del círculo"
-                disabled={bloqueada}
-                onChange={(radius) => cambiarSubtipo({ radius }, `layer:${id}:radius`)}
-              />
+              <NumericInput value={selectedLayer.circulo.radius} min={1} max={5000} step={1} decimals={0} suffix="px" ariaLabel="Radio del círculo" disabled={bloqueada} onChange={(radius) => cambiarSubtipo({ radius }, `layer:${id}:radius`)} />
             </div>
             <div>
               <span className="prop-mini-label">Diámetro</span>
@@ -370,17 +323,7 @@ export default function RightPanel({
         {tipo === 'linea' && (
           <div className="prop-mt">
             <span className="prop-mini-label">Longitud</span>
-            <NumericInput
-              value={longitudLinea}
-              min={1}
-              max={10000}
-              step={5}
-              decimals={0}
-              suffix="px"
-              ariaLabel="Longitud de línea"
-              disabled={bloqueada}
-              onChange={cambiarLongitudLinea}
-            />
+            <NumericInput value={longitudLinea} min={1} max={10000} step={5} decimals={0} suffix="px" ariaLabel="Longitud de línea" disabled={bloqueada} onChange={cambiarLongitudLinea} />
           </div>
         )}
 
@@ -388,31 +331,11 @@ export default function RightPanel({
           <div className="prop-grid-2 prop-mt">
             <div>
               <span className="prop-mini-label">Ancho (W)</span>
-              <NumericInput
-                value={cajaTexto.width}
-                min={8}
-                max={10000}
-                step={4}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Ancho del texto"
-                disabled={bloqueada}
-                onChange={(nuevoAncho) => updateTextBox(id, { width: nuevoAncho }, { historyKey: `layer:${id}:text-w` })}
-              />
+              <NumericInput value={cajaTexto.width} min={8} max={10000} step={4} decimals={0} suffix="px" ariaLabel="Ancho del texto" disabled={bloqueada} onChange={(nuevoAncho) => updateTextBox(id, { width: nuevoAncho }, { historyKey: `layer:${id}:text-w` })} />
             </div>
             <div>
               <span className="prop-mini-label">Alto (H)</span>
-              <NumericInput
-                value={cajaTexto.height}
-                min={8}
-                max={10000}
-                step={4}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Alto del texto"
-                disabled={bloqueada}
-                onChange={(nuevoAlto) => updateTextBox(id, { height: nuevoAlto }, { historyKey: `layer:${id}:text-h` })}
-              />
+              <NumericInput value={cajaTexto.height} min={8} max={10000} step={4} decimals={0} suffix="px" ariaLabel="Alto del texto" disabled={bloqueada} onChange={(nuevoAlto) => updateTextBox(id, { height: nuevoAlto }, { historyKey: `layer:${id}:text-h` })} />
             </div>
           </div>
         )}
@@ -421,48 +344,14 @@ export default function RightPanel({
           <div className="prop-image-size-row prop-mt">
             <div>
               <span className="prop-mini-label">Ancho (W)</span>
-              <NumericInput
-                value={selectedLayer.imagen.width}
-                min={1}
-                max={10000}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Ancho de imagen"
-                disabled={bloqueada}
-                onChange={cambiarAnchoImagen}
-              />
+              <NumericInput value={selectedLayer.imagen.width} min={1} max={10000} step={1} decimals={0} suffix="px" ariaLabel="Ancho de imagen" disabled={bloqueada} onChange={cambiarAnchoImagen} />
             </div>
-            <button
-              type="button"
-              className={`ratio-lock-btn ${keepImageRatio ? 'is-active' : ''}`}
-              aria-label="Bloquear proporción de imagen"
-              aria-pressed={keepImageRatio}
-              disabled={bloqueada}
-              title={keepImageRatio ? 'Proporción bloqueada' : 'Proporción libre'}
-              onClick={() => {
-                const next = !keepImageRatio;
-                if (next) {
-                  imageRatioRef.current = selectedLayer.imagen.width / Math.max(1, selectedLayer.imagen.height);
-                }
-                setKeepImageRatio(next);
-              }}
-            >
+            <button type="button" className={`ratio-lock-btn ${keepImageRatio ? 'is-active' : ''}`} aria-label="Bloquear proporción de imagen" aria-pressed={keepImageRatio} disabled={bloqueada} title={keepImageRatio ? 'Proporción bloqueada' : 'Proporción libre'} onClick={() => { const next = !keepImageRatio; if (next) { imageRatioRef.current = selectedLayer.imagen.width / Math.max(1, selectedLayer.imagen.height); } setKeepImageRatio(next); }}>
               <Icon name={keepImageRatio ? 'lock' : 'unlock'} size={14} />
             </button>
             <div>
               <span className="prop-mini-label">Alto (H)</span>
-              <NumericInput
-                value={selectedLayer.imagen.height}
-                min={1}
-                max={10000}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Alto de imagen"
-                disabled={bloqueada}
-                onChange={cambiarAltoImagen}
-              />
+              <NumericInput value={selectedLayer.imagen.height} min={1} max={10000} step={1} decimals={0} suffix="px" ariaLabel="Alto de imagen" disabled={bloqueada} onChange={cambiarAltoImagen} />
             </div>
           </div>
         )}
@@ -470,108 +359,57 @@ export default function RightPanel({
         <div className="prop-grid-2 prop-mt">
           <div>
             <span className="prop-mini-label">Rotación</span>
-            <NumericInput
-              value={selectedLayer.rotation}
-              min={-360}
-              max={360}
-              step={1}
-              decimals={0}
-              suffix="°"
-              ariaLabel="Rotación"
-              disabled={bloqueada}
-              onChange={(rotation) => cambiarComun({ rotation }, `layer:${id}:rotation`)}
-            />
+            <NumericInput value={selectedLayer.rotation} min={-360} max={360} step={1} decimals={0} suffix="°" ariaLabel="Rotación" disabled={bloqueada} onChange={(rotation) => cambiarComun({ rotation }, `layer:${id}:rotation`)} />
           </div>
           <div>
             <span className="prop-mini-label">Opacidad (0–1)</span>
-            <NumericInput
-              value={selectedLayer.opacity}
-              min={0}
-              max={1}
-              step={0.1}
-              decimals={1}
-              ariaLabel="Opacidad"
-              disabled={bloqueada}
-              onChange={(opacity) => cambiarComun({ opacity: redondear(clamp(opacity, 0, 1), 1) }, `layer:${id}:opacity`)}
-            />
+            <NumericInput value={selectedLayer.opacity} min={0} max={1} step={0.1} decimals={1} ariaLabel="Opacidad" disabled={bloqueada} onChange={(opacity) => cambiarComun({ opacity: redondear(clamp(opacity, 0, 1), 1) }, `layer:${id}:opacity`)} />
           </div>
         </div>
 
         <div className="opacity-slider-row">
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            aria-label="Deslizador de transparencia"
-            disabled={bloqueada}
-            value={selectedLayer.opacity}
-            onPointerDown={() => beginHistoryBatch()}
-            onPointerUp={() => endHistoryBatch()}
-            onPointerCancel={() => endHistoryBatch()}
-            onChange={(event) => cambiarComun(
-              { opacity: redondear(clamp(Number(event.target.value), 0, 1), 1) },
-              `layer:${id}:opacity-slider`,
-            )}
-          />
+          <input type="range" min="0" max="1" step="0.1" aria-label="Deslizador de transparencia" disabled={bloqueada} value={selectedLayer.opacity} onPointerDown={() => beginHistoryBatch()} onPointerUp={() => endHistoryBatch()} onPointerCancel={() => endHistoryBatch()} onChange={(event) => cambiarComun({ opacity: redondear(clamp(Number(event.target.value), 0, 1), 1) }, `layer:${id}:opacity-slider`)} />
           <span>{Math.round(selectedLayer.opacity * 100)}%</span>
         </div>
       </div>
+
+      {/* Específicas: IMAGEN */}
+      {tipo === 'imagen' && (
+        <div className="rp-section">
+          <label className="prop-sub-label" htmlFor="prop-image-source">Etiqueta / URL de imagen</label>
+          <input
+            id="prop-image-source"
+            type="text"
+            className="rp-text-input"
+            aria-label="Etiqueta o URL de imagen"
+            placeholder="{{imagen}} o https://…"
+            value={selectedLayer.imagen.src ?? ''}
+            disabled={bloqueada}
+            onChange={(event) => cambiarSubtipo({ src: event.target.value }, `layer:${id}:img-src`)}
+          />
+          <p className="rp-muted-note">
+            Escribe <code>{'{{nombre-columna}}'}</code> para usar el enlace de cada fila.
+          </p>
+        </div>
+      )}
 
       {/* Específicas: RECT */}
       {tipo === 'rect' && (
         <>
           <div className="rp-section">
             <span className="prop-sub-label">Esquinas</span>
-            <NumericInput
-              value={selectedLayer.rect.cornerRadius}
-              min={0}
-              max={2000}
-              step={1}
-              decimals={0}
-              suffix="px"
-              ariaLabel="Radio de esquina"
-              disabled={bloqueada}
-              onChange={(cornerRadius) => cambiarSubtipo({ cornerRadius }, `layer:${id}:radius`)}
-            />
+            <NumericInput value={selectedLayer.rect.cornerRadius} min={0} max={2000} step={1} decimals={0} suffix="px" ariaLabel="Radio de esquina" disabled={bloqueada} onChange={(cornerRadius) => cambiarSubtipo({ cornerRadius }, `layer:${id}:radius`)} />
           </div>
 
           <div className="rp-section">
-            <FillEditor
-              label="Relleno"
-              value={selectedLayer.rect.fill}
-              disabled={bloqueada}
-              historyPrefix={`layer-${id}-fill`}
-              onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:fill`)}
-            />
+            <FillEditor label="Relleno" value={selectedLayer.rect.fill} disabled={bloqueada} historyPrefix={`layer-${id}-fill`} onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:fill`)} />
           </div>
 
           <div className="rp-section">
             <span className="prop-sub-label">Borde (Stroke)</span>
             <div className="stroke-row">
-              <HexColorControl
-                value={normalizarStroke(selectedLayer.rect.stroke).color}
-                ariaLabel="Color de borde"
-                disabled={bloqueada}
-                onChange={(color) => cambiarSubtipo(
-                  { stroke: { ...normalizarStroke(selectedLayer.rect.stroke), color } },
-                  `layer:${id}:stroke-color`,
-                )}
-              />
-              <NumericInput
-                value={normalizarStroke(selectedLayer.rect.stroke).width}
-                min={0}
-                max={200}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Ancho de borde"
-                disabled={bloqueada}
-                onChange={(width) => cambiarSubtipo(
-                  { stroke: { ...normalizarStroke(selectedLayer.rect.stroke), width } },
-                  `layer:${id}:stroke-width`,
-                )}
-              />
+              <HexColorControl value={normalizarStroke(selectedLayer.rect.stroke).color} ariaLabel="Color de borde" disabled={bloqueada} onChange={(color) => cambiarSubtipo({ stroke: { ...normalizarStroke(selectedLayer.rect.stroke), color } }, `layer:${id}:stroke-color`)} />
+              <NumericInput value={normalizarStroke(selectedLayer.rect.stroke).width} min={0} max={200} step={1} decimals={0} suffix="px" ariaLabel="Ancho de borde" disabled={bloqueada} onChange={(width) => cambiarSubtipo({ stroke: { ...normalizarStroke(selectedLayer.rect.stroke), width } }, `layer:${id}:stroke-width`)} />
             </div>
           </div>
         </>
@@ -581,41 +419,14 @@ export default function RightPanel({
       {tipo === 'circulo' && (
         <>
           <div className="rp-section">
-            <FillEditor
-              label="Relleno"
-              value={selectedLayer.circulo.fill}
-              disabled={bloqueada}
-              historyPrefix={`layer-${id}-fill`}
-              onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:fill`)}
-            />
+            <FillEditor label="Relleno" value={selectedLayer.circulo.fill} disabled={bloqueada} historyPrefix={`layer-${id}-fill`} onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:fill`)} />
           </div>
 
           <div className="rp-section">
             <span className="prop-sub-label">Borde (Stroke)</span>
             <div className="stroke-row">
-              <HexColorControl
-                value={normalizarStroke(selectedLayer.circulo.stroke).color}
-                ariaLabel="Color de borde"
-                disabled={bloqueada}
-                onChange={(color) => cambiarSubtipo(
-                  { stroke: { ...normalizarStroke(selectedLayer.circulo.stroke), color } },
-                  `layer:${id}:stroke-color`,
-                )}
-              />
-              <NumericInput
-                value={normalizarStroke(selectedLayer.circulo.stroke).width}
-                min={0}
-                max={200}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Ancho de borde"
-                disabled={bloqueada}
-                onChange={(width) => cambiarSubtipo(
-                  { stroke: { ...normalizarStroke(selectedLayer.circulo.stroke), width } },
-                  `layer:${id}:stroke-width`,
-                )}
-              />
+              <HexColorControl value={normalizarStroke(selectedLayer.circulo.stroke).color} ariaLabel="Color de borde" disabled={bloqueada} onChange={(color) => cambiarSubtipo({ stroke: { ...normalizarStroke(selectedLayer.circulo.stroke), color } }, `layer:${id}:stroke-color`)} />
+              <NumericInput value={normalizarStroke(selectedLayer.circulo.stroke).width} min={0} max={200} step={1} decimals={0} suffix="px" ariaLabel="Ancho de borde" disabled={bloqueada} onChange={(width) => cambiarSubtipo({ stroke: { ...normalizarStroke(selectedLayer.circulo.stroke), width } }, `layer:${id}:stroke-width`)} />
             </div>
           </div>
         </>
@@ -627,82 +438,18 @@ export default function RightPanel({
           <div className="rp-section">
             <span className="prop-sub-label">Trazo (Stroke)</span>
             <div className="stroke-row">
-              <HexColorControl
-                value={normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', selectedLayer.linea.strokeWidth).color}
-                ariaLabel="Color de línea"
-                disabled={bloqueada}
-                onChange={(color) => {
-                  const strokeActual = normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', selectedLayer.linea.strokeWidth);
-                  cambiarSubtipo({ stroke: { ...strokeActual, color } }, `layer:${id}:line-color`);
-                }}
-              />
-              <NumericInput
-                value={selectedLayer.linea.strokeWidth}
-                min={1}
-                max={200}
-                step={1}
-                decimals={0}
-                suffix="px"
-                ariaLabel="Grosor de línea"
-                disabled={bloqueada}
-                onChange={(width) => {
-                  const strokeActual = normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', width);
-                  cambiarSubtipo(
-                    { stroke: { ...strokeActual, width }, strokeWidth: width },
-                    `layer:${id}:line-width`,
-                  );
-                }}
-              />
+              <HexColorControl value={normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', selectedLayer.linea.strokeWidth).color} ariaLabel="Color de línea" disabled={bloqueada} onChange={(color) => { const strokeActual = normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', selectedLayer.linea.strokeWidth); cambiarSubtipo({ stroke: { ...strokeActual, color } }, `layer:${id}:line-color`); }} />
+              <NumericInput value={selectedLayer.linea.strokeWidth} min={1} max={200} step={1} decimals={0} suffix="px" ariaLabel="Grosor de línea" disabled={bloqueada} onChange={(width) => { const strokeActual = normalizarStroke(selectedLayer.linea.stroke, '#1f2b23', width); cambiarSubtipo({ stroke: { ...strokeActual, width }, strokeWidth: width }, `layer:${id}:line-width`); }} />
             </div>
           </div>
 
           <div className="rp-section">
             <span className="prop-sub-label">Puntos locales (X1, Y1 → X2, Y2)</span>
             <div className="prop-grid-2">
-              <div>
-                <span className="prop-mini-label">X1</span>
-                <NumericInput
-                  value={puntosLinea[0]}
-                  step={1}
-                  decimals={0}
-                  ariaLabel="Punto X1"
-                  disabled={bloqueada}
-                  onChange={(v) => cambiarSubtipo({ points: [v, puntosLinea[1], puntosLinea[2], puntosLinea[3]] }, `layer:${id}:p0`)}
-                />
-              </div>
-              <div>
-                <span className="prop-mini-label">Y1</span>
-                <NumericInput
-                  value={puntosLinea[1]}
-                  step={1}
-                  decimals={0}
-                  ariaLabel="Punto Y1"
-                  disabled={bloqueada}
-                  onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], v, puntosLinea[2], puntosLinea[3]] }, `layer:${id}:p1`)}
-                />
-              </div>
-              <div>
-                <span className="prop-mini-label">X2</span>
-                <NumericInput
-                  value={puntosLinea[2]}
-                  step={1}
-                  decimals={0}
-                  ariaLabel="Punto X2"
-                  disabled={bloqueada}
-                  onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], puntosLinea[1], v, puntosLinea[3]] }, `layer:${id}:p2`)}
-                />
-              </div>
-              <div>
-                <span className="prop-mini-label">Y2</span>
-                <NumericInput
-                  value={puntosLinea[3]}
-                  step={1}
-                  decimals={0}
-                  ariaLabel="Punto Y2"
-                  disabled={bloqueada}
-                  onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], puntosLinea[1], puntosLinea[2], v] }, `layer:${id}:p3`)}
-                />
-              </div>
+              <div><span className="prop-mini-label">X1</span><NumericInput value={puntosLinea[0]} step={1} decimals={0} ariaLabel="Punto X1" disabled={bloqueada} onChange={(v) => cambiarSubtipo({ points: [v, puntosLinea[1], puntosLinea[2], puntosLinea[3]] }, `layer:${id}:p0`)} /></div>
+              <div><span className="prop-mini-label">Y1</span><NumericInput value={puntosLinea[1]} step={1} decimals={0} ariaLabel="Punto Y1" disabled={bloqueada} onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], v, puntosLinea[2], puntosLinea[3]] }, `layer:${id}:p1`)} /></div>
+              <div><span className="prop-mini-label">X2</span><NumericInput value={puntosLinea[2]} step={1} decimals={0} ariaLabel="Punto X2" disabled={bloqueada} onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], puntosLinea[1], v, puntosLinea[3]] }, `layer:${id}:p2`)} /></div>
+              <div><span className="prop-mini-label">Y2</span><NumericInput value={puntosLinea[3]} step={1} decimals={0} ariaLabel="Punto Y2" disabled={bloqueada} onChange={(v) => cambiarSubtipo({ points: [puntosLinea[0], puntosLinea[1], puntosLinea[2], v] }, `layer:${id}:p3`)} /></div>
             </div>
           </div>
         </>
@@ -713,23 +460,13 @@ export default function RightPanel({
         <>
           <div className="rp-section">
             <label className="prop-sub-label" htmlFor="prop-text-content">Contenido</label>
-            <textarea
-              id="prop-text-content"
-              className="rp-textarea"
-              rows={3}
-              aria-label="Contenido del texto"
-              disabled={bloqueada}
-              value={selectedLayer.texto.texto}
-              onChange={(event) => cambiarSubtipo({ texto: event.target.value }, `layer:${id}:texto`)}
-            />
+            <textarea id="prop-text-content" className="rp-textarea" rows={3} aria-label="Contenido del texto" disabled={bloqueada} value={selectedLayer.texto.texto} onChange={(event) => cambiarSubtipo({ texto: event.target.value }, `layer:${id}:texto`)} />
             {placeholders.length > 0 && (
               <div className="placeholders-preview" data-testid="detected-placeholders">
                 <div className="placeholders-Rich">{renderTextoConPlaceholders(selectedLayer.texto.texto)}</div>
                 <div className="placeholders-tags">
                   <span>Campos dinámicos:</span>
-                  {placeholders.map((campo) => (
-                    <code key={campo}>{`{{${campo}}}`}</code>
-                  ))}
+                  {placeholders.map((campo) => (<code key={campo}>{`{{${campo}}}`}</code>))}
                 </div>
               </div>
             )}
@@ -738,259 +475,65 @@ export default function RightPanel({
           <div className="rp-section">
             <div className="rp-section-head">
               <span className="prop-sub-label">Tipografía (Google Fonts)</span>
-              {fontLoadStatus === 'loading' && (
-                <span className="font-status-badge is-loading" data-testid="font-load-status" role="status">
-                  Cargando fuente…
-                </span>
-              )}
-              {fontLoadStatus === 'error' && (
-                <span className="font-status-badge is-error" data-testid="font-load-status" role="status">
-                  Usando alternativa
-                </span>
-              )}
+              {fontLoadStatus === 'loading' && (<span className="font-status-badge is-loading">Cargando…</span>)}
+              {fontLoadStatus === 'error' && (<span className="font-status-badge is-error">Error</span>)}
             </div>
-
             <select
               className="rp-select"
-              aria-label="Seleccionar fuente usada"
+              aria-label="Fuente"
+              value={selectedLayer.texto.fontFamily}
               disabled={bloqueada}
-              value={fuentesDisponibles.includes(selectedLayer.texto.fontFamily) ? selectedLayer.texto.fontFamily : '__custom__'}
-              onChange={(event) => {
-                if (event.target.value !== '__custom__') {
-                  seleccionarFuenteGoogle(event.target.value, `layer:${id}:font`);
-                }
-              }}
+              onChange={(event) => seleccionarFuenteGoogle(event.target.value, `layer:${id}:font`)}
             >
-              {fuentesDisponibles.map((fuente) => (
-                <option key={fuente} value={fuente}>{fuente}</option>
-              ))}
-              {!fuentesDisponibles.includes(selectedLayer.texto.fontFamily) && (
-                <option value="__custom__">Personalizada: {selectedLayer.texto.fontFamily}</option>
-              )}
+              {fuentesDisponibles.map((familia) => (<option key={familia} value={familia}>{familia}</option>))}
             </select>
-
-            <div className="font-custom-row prop-mt-sm">
-              <input
-                type="text"
-                className="rp-text-input"
-                aria-label="Nombre de fuente libre"
-                placeholder="Otra Google Font (ej. Pacifico)"
-                disabled={bloqueada}
-                value={customFontDraft}
-                onChange={(event) => setCustomFontDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    seleccionarFuenteGoogle(customFontDraft, `layer:${id}:font-free`);
-                  } else if (event.key === 'Escape') {
-                    setCustomFontDraft(selectedLayer.texto.fontFamily);
-                  }
-                }}
-                onBlur={() => {
-                  const limpia = normalizarNombreFuente(customFontDraft);
-                  if (!limpia) {
-                    setCustomFontDraft(selectedLayer.texto.fontFamily || 'Inter');
-                  } else if (limpia !== selectedLayer.texto.fontFamily) {
-                    seleccionarFuenteGoogle(limpia, `layer:${id}:font-free`);
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="rp-btn font-load-btn"
-                aria-label="Cargar Google Font"
-                disabled={bloqueada || !normalizarNombreFuente(customFontDraft)}
-                onClick={() => seleccionarFuenteGoogle(customFontDraft, `layer:${id}:font-free`)}
-              >
-                Cargar
-              </button>
-            </div>
-
-            <div className="prop-grid-2 prop-mt">
-              <div>
-                <span className="prop-mini-label">Tamaño</span>
-                <NumericInput
-                  value={selectedLayer.texto.fontSize}
-                  min={8}
-                  max={600}
-                  step={1}
-                  decimals={0}
-                  suffix="px"
-                  ariaLabel="Tamaño de fuente"
-                  disabled={bloqueada}
-                  onChange={(fontSize) => cambiarSubtipo({ fontSize }, `layer:${id}:font-size`)}
-                />
-              </div>
-              <div>
-                <span className="prop-mini-label">Estilo y alineación</span>
-                <div className="text-style-bar">
-                  <button
-                    type="button"
-                    className={`style-toggle-btn ${selectedLayer.texto.fontStyle === 'bold' ? 'is-active' : ''}`}
-                    aria-label="Negrita"
-                    aria-pressed={selectedLayer.texto.fontStyle === 'bold'}
-                    disabled={bloqueada}
-                    title="Negrita"
-                    onClick={() => cambiarSubtipo(
-                      { fontStyle: selectedLayer.texto.fontStyle === 'bold' ? 'normal' : 'bold' },
-                      `layer:${id}:bold`,
-                    )}
-                  >
-                    <strong>B</strong>
-                  </button>
-                  <button
-                    type="button"
-                    className={`style-toggle-btn ${selectedLayer.texto.align === 'left' ? 'is-active' : ''}`}
-                    aria-label="Alinear a la izquierda"
-                    aria-pressed={selectedLayer.texto.align === 'left'}
-                    disabled={bloqueada}
-                    onClick={() => cambiarSubtipo({ align: 'left' }, `layer:${id}:align`)}
-                  >
-                    <Icon name="alignLeft" size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`style-toggle-btn ${selectedLayer.texto.align === 'center' ? 'is-active' : ''}`}
-                    aria-label="Centrar texto"
-                    aria-pressed={selectedLayer.texto.align === 'center'}
-                    disabled={bloqueada}
-                    onClick={() => cambiarSubtipo({ align: 'center' }, `layer:${id}:align`)}
-                  >
-                    <Icon name="alignCenter" size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`style-toggle-btn ${selectedLayer.texto.align === 'right' ? 'is-active' : ''}`}
-                    aria-label="Alinear a la derecha"
-                    aria-pressed={selectedLayer.texto.align === 'right'}
-                    disabled={bloqueada}
-                    onClick={() => cambiarSubtipo({ align: 'right' }, `layer:${id}:align`)}
-                  >
-                    <Icon name="alignRight" size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="prop-grid-2 prop-mt">
-              <div>
-                <span className="prop-mini-label">Espaciado</span>
-                <NumericInput
-                  value={selectedLayer.texto.letterSpacing}
-                  min={-20}
-                  max={100}
-                  step={0.5}
-                  decimals={1}
-                  suffix="px"
-                  ariaLabel="Espaciado de letras"
-                  disabled={bloqueada}
-                  onChange={(letterSpacing) => cambiarSubtipo({ letterSpacing }, `layer:${id}:tracking`)}
-                />
-              </div>
-              <div>
-                <span className="prop-mini-label">Interlineado</span>
-                <NumericInput
-                  value={selectedLayer.texto.lineHeight}
-                  min={0.5}
-                  max={5}
-                  step={0.1}
-                  decimals={1}
-                  ariaLabel="Interlineado"
-                  disabled={bloqueada}
-                  onChange={(lineHeight) => cambiarSubtipo({ lineHeight }, `layer:${id}:leading`)}
-                />
-              </div>
+            <div className="rp-font-custom">
+              <input type="text" className="rp-text-input" aria-label="Fuente personalizada" placeholder="Nombre exacto de Google Fonts" value={customFontDraft} disabled={bloqueada} onChange={(event) => setCustomFontDraft(event.target.value)} />
+              <button type="button" className="rp-btn" disabled={bloqueada || !customFontDraft.trim()} onClick={() => seleccionarFuenteGoogle(customFontDraft, `layer:${id}:font-custom`)}>Aplicar</button>
             </div>
           </div>
 
-          {cajaTexto && (
-            <div className="rp-section">
-              <div className="autofit-toggle-row">
-                <div>
-                  <span className="prop-sub-label prop-no-margin">Auto-fit en caja</span>
-                  <small className="prop-helper-note">Reduce el tamaño hasta caber en {cajaTexto.width} × {cajaTexto.height} px</small>
-                </div>
-                <button
-                  type="button"
-                  className={`autofit-switch ${cajaTexto.autoFit ? 'is-on' : ''}`}
-                  aria-label="Auto-fit de texto"
-                  aria-pressed={cajaTexto.autoFit}
-                  disabled={bloqueada}
-                  onClick={() => updateTextBox(id, { autoFit: !cajaTexto.autoFit })}
-                >
-                  <span className="autofit-switch-thumb" />
-                </button>
-              </div>
-
-              <div className="prop-mt">
-                <span className="prop-mini-label">Desbordamiento (Overflow)</span>
-                <div className="overflow-segmented" role="group" aria-label="Modo de overflow de texto">
-                  {[
-                    { key: 'ajustar', label: 'Ajustar' },
-                    { key: 'recortar', label: 'Recortar' },
-                    { key: 'libre', label: 'Libre' },
-                  ].map((modo) => (
-                    <button
-                      key={modo.key}
-                      type="button"
-                      className={`overflow-seg-btn ${cajaTexto.overflow === modo.key ? 'is-active' : ''}`}
-                      aria-label={`Overflow ${modo.key}`}
-                      aria-pressed={cajaTexto.overflow === modo.key}
-                      disabled={bloqueada}
-                      onClick={() => updateTextBox(id, { overflow: modo.key })}
-                    >
-                      {modo.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="rp-section">
+            <span className="prop-sub-label">Tamaño</span>
+            <NumericInput value={selectedLayer.texto.fontSize} min={1} max={500} step={1} decimals={0} suffix="px" ariaLabel="Tamaño de texto" disabled={bloqueada} onChange={(fontSize) => cambiarSubtipo({ fontSize }, `layer:${id}:font-size`)} />
+          </div>
 
           <div className="rp-section">
-            <FillEditor
-              label="Relleno de texto"
-              value={selectedLayer.texto.fill}
-              disabled={bloqueada}
-              historyPrefix={`layer-${id}-fill`}
-              onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:fill`)}
-            />
+            <span className="prop-sub-label">Alineación</span>
+            <div className="rp-action-row">
+              {['left','center','right'].map((alineacion) => (
+                <button key={alineacion} type="button" className={`rp-btn ${selectedLayer.texto.align === alineacion ? 'is-active' : ''}`} aria-label={`Alinear ${alineacion}`} title={`Alinear ${alineacion}`} disabled={bloqueada} onClick={() => cambiarSubtipo({ align: alineacion }, `layer:${id}:align`)}>
+                  {alineacion === 'left' ? 'Izq.' : alineacion === 'center' ? 'Centro' : 'Der.'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rp-section">
+            <FillEditor label="Color del texto" value={selectedLayer.texto.fill} disabled={bloqueada} historyPrefix={`layer-${id}-text-fill`} onChange={(fill, opts) => cambiarSubtipo({ fill }, opts?.historyKey || `layer:${id}:text-fill`)} />
           </div>
         </>
       )}
 
-      {/* Específicas: IMAGEN */}
+      {/* Acciones de imagen */}
       {tipo === 'imagen' && (
         <div className="rp-section">
-          <span className="prop-sub-label">Origen y recorte</span>
-          <div className="rp-image-actions">
-            <button
-              type="button"
-              className="rp-btn"
-              disabled={bloqueada}
-              onClick={() => onReplaceImageFile(id)}
-            >
-              <Icon name="image" size={14} /> Reemplazar archivo
-            </button>
-            <button
-              type="button"
-              className="rp-btn"
-              disabled={bloqueada}
-              onClick={() => onReplaceImageUrl(id)}
-            >
-              <Icon name="link" size={14} /> Desde URL
-            </button>
-            <button
-              type="button"
-              className="rp-btn rp-btn-accent"
-              disabled={bloqueada}
-              onClick={() => onOpenCrop(id)}
-            >
-              <Icon name="crop" size={14} /> Recortar imagen
-            </button>
+          <span className="prop-sub-label">Reemplazar imagen</span>
+          <div className="rp-action-row">
+            <button type="button" className="rp-btn" disabled={bloqueada} onClick={() => onReplaceImageFile(id)}><Icon name="image" size={14} /> Archivo</button>
+            <button type="button" className="rp-btn" disabled={bloqueada} onClick={() => onReplaceImageUrl(id)}><Icon name="link" size={14} /> URL</button>
+            <button type="button" className="rp-btn" disabled={bloqueada} onClick={() => onOpenCrop(id)}><Icon name="crop" size={14} /> Recortar</button>
           </div>
         </div>
       )}
+
+      {/* Acciones comunes */}
+      <div className="rp-section">
+        <div className="rp-action-row">
+          <button type="button" className="rp-btn" disabled={bloqueada} onClick={duplicateSelected}><Icon name="copy" size={14} /> Duplicar</button>
+          <button type="button" className="rp-btn rp-btn-danger" disabled={bloqueada} onClick={deleteSelected}><Icon name="trash" size={14} /> Eliminar</button>
+        </div>
+      </div>
     </aside>
   );
 }
