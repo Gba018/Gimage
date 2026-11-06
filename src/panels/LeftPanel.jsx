@@ -11,7 +11,45 @@ const OPCIONES_FUENTE = [
   { id: 'hoja', label: 'Hoja', icon: 'sheet' },
 ];
 
-export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, onActualizarDatos, loteEstado, locked }) {
+const ESTILOS = `
+.gp-left{width:300px;min-width:300px;height:100%;display:flex;flex-direction:column;background:#0f172a;color:#e2e8f0;border-right:1px solid #1e293b;font-family:Inter,system-ui,sans-serif;}
+.gp-tabs{display:flex;border-bottom:1px solid #1e293b;}
+.gp-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;background:transparent;border:0;color:#94a3b8;font-size:11px;cursor:pointer;}
+.gp-tab.is-active{color:#7dd3fc;background:#1e293b;}
+.gp-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+.gp-title{margin:0;font-size:15px;font-weight:700;color:#f8fafc;}
+.gp-hint{margin:0;font-size:12px;line-height:1.5;color:#94a3b8;}
+.gp-hint code{background:#1e293b;padding:2px 5px;border-radius:4px;color:#7dd3fc;}
+.gp-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;font-weight:600;cursor:pointer;}
+.gp-btn:hover:not(:disabled){background:#334155;}
+.gp-btn:disabled{opacity:.45;cursor:not-allowed;}
+.gp-btn.primary{background:#0ea5e9;border-color:#0ea5e9;color:#04121d;}
+.gp-btn.primary:hover:not(:disabled){background:#38bdf8;}
+.gp-row{display:flex;gap:8px;}
+.gp-input,.gp-select{width:100%;padding:9px 10px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-size:13px;}
+.gp-input:focus,.gp-select:focus{outline:2px solid #0ea5e9;outline-offset:1px;}
+.gp-card{border:1px solid #1e293b;border-radius:12px;padding:12px;background:#111c2e;display:flex;flex-direction:column;gap:8px;}
+.gp-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.gp-card-head strong{font-size:13px;color:#f8fafc;}
+.gp-badge{font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:3px 7px;border-radius:999px;background:#1e293b;color:#94a3b8;}
+.gp-badge.imagen{background:#4c1d95;color:#ddd6fe;}
+.gp-actions{display:flex;gap:6px;}
+.gp-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#cbd5f5;cursor:pointer;}
+.gp-icon-btn:hover:not(:disabled){background:#334155;}
+.gp-icon-btn:disabled{opacity:.4;cursor:not-allowed;}
+.gp-map{display:flex;flex-direction:column;gap:8px;}
+.gp-map-row{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;font-size:12px;color:#cbd5f5;}
+.gp-summary{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;background:#111c2e;border:1px solid #1e293b;font-size:12px;}
+.gp-progress{height:6px;border-radius:999px;background:#1e293b;overflow:hidden;}
+.gp-progress > div{height:100%;background:#0ea5e9;transition:width .2s ease;}
+.gp-error{margin:0;color:#fca5a5;font-size:12px;}
+.gp-success{margin:0;color:#86efac;font-size:12px;}
+.gp-shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.gp-shape{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:10px;border:1px solid #1e293b;background:#111c2e;color:#cbd5f5;font-size:11px;cursor:pointer;}
+.gp-shape:hover:not(:disabled){background:#1e293b;}
+`;
+
+export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, onInsertLine, onInsertImage, onImageUrl, onGenerarLote, onCancelarLote, onReintentarLote, loteEstado, locked }) {
   const [fuente, setFuente] = useState('texto');
   const [nuevoCampo, setNuevoCampo] = useState('');
   const template = useTemplateStore((state) => state.template);
@@ -24,7 +62,6 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const setFieldDefault = useTemplateStore((state) => state.setFieldDefault);
   const setColumnField = useTemplateStore((state) => state.setColumnField);
   const setActiveRowIndex = useTemplateStore((state) => state.setActiveRowIndex);
-  const setSheetStatus = useTemplateStore((state) => state.setSheetStatus);
   const setSheetsConfig = useTemplateStore((state) => state.setSheetsConfig);
   const connectSheet = useTemplateStore((state) => state.connectSheet);
   const [sheetUrl, setSheetUrl] = useState(sheets.spreadsheetId || '');
@@ -33,10 +70,10 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const progreso = loteEstado.total ? Math.round((loteEstado.actual / loteEstado.total) * 100) : 0;
 
   useEffect(() => {
-    function actualizar() { connectSheet().catch(() => setSheetStatus('error')); }
+    function actualizar() { connectSheet().catch(() => {}); }
     window.addEventListener('gimage:actualizar-sheets', actualizar);
     return () => window.removeEventListener('gimage:actualizar-sheets', actualizar);
-  }, [connectSheet, setSheetStatus]);
+  }, [connectSheet]);
 
   function agregarCampo(event) {
     event.preventDefault();
@@ -48,145 +85,142 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
 
   function conectarHoja() {
     setSheetsConfig({ spreadsheetId: sheetUrl.trim() });
-    window.setTimeout(() => { connectSheet().catch(() => setSheetStatus('error')); }, 0);
+    window.setTimeout(() => { connectSheet().catch(() => {}); }, 0);
   }
 
   return (
-    <aside className="left-panel">
-      <div className="panel-tabs" role="tablist" aria-label="Fuentes de capas y datos">
+    <aside className="gp-left">
+      <style>{ESTILOS}</style>
+      <div className="gp-tabs" role="tablist">
         {OPCIONES_FUENTE.map((opcion) => (
-          <button key={opcion.id} type="button" role="tab" aria-selected={fuente === opcion.id} className={`panel-tab ${fuente === opcion.id ? 'is-active' : ''}`} onClick={() => setFuente(opcion.id)}>
+          <button key={opcion.id} type="button" role="tab" aria-selected={fuente === opcion.id} className={`gp-tab ${fuente === opcion.id ? 'is-active' : ''}`} onClick={() => setFuente(opcion.id)}>
             <Icon name={opcion.icon} size={16} />
             <span>{opcion.label}</span>
           </button>
         ))}
       </div>
 
-      {fuente === 'texto' && (
-        <section className="panel-section">
-          <h2>Texto</h2>
-          <p>Añade un cuadro de texto editable al lienzo.</p>
-          <button type="button" className="primary-action" onClick={onInsertText} disabled={locked}><Icon name="plus" size={16} /><span>Añadir texto</span></button>
-        </section>
-      )}
+      <div className="gp-body">
+        {fuente === 'texto' && (
+          <section>
+            <h2 className="gp-title">Texto</h2>
+            <p className="gp-hint">Añade un cuadro de texto editable al lienzo.</p>
+            <button type="button" className="gp-btn primary" onClick={onInsertText} disabled={locked}><Icon name="plus" size={16} /><span>Añadir texto</span></button>
+          </section>
+        )}
 
-      {fuente === 'formas' && (
-        <section className="panel-section">
-          <h2>Formas</h2>
-          <div className="shape-grid">
-            <button type="button" onClick={onInsertRect} disabled={locked}><Icon name="square" size={20} /><span>Rectángulo</span></button>
-            <button type="button" onClick={onInsertCircle} disabled={locked}><Icon name="circle" size={20} /><span>Círculo</span></button>
-            <button type="button" onClick={onInsertLine} disabled={locked}><Icon name="line" size={20} /><span>Línea</span></button>
-          </div>
-        </section>
-      )}
+        {fuente === 'formas' && (
+          <section>
+            <h2 className="gp-title">Formas</h2>
+            <div className="gp-shapes">
+              <button type="button" className="gp-shape" onClick={onInsertRect} disabled={locked}><Icon name="square" size={20} /><span>Rectángulo</span></button>
+              <button type="button" className="gp-shape" onClick={onInsertCircle} disabled={locked}><Icon name="circle" size={20} /><span>Círculo</span></button>
+              <button type="button" className="gp-shape" onClick={onInsertLine} disabled={locked}><Icon name="line" size={20} /><span>Línea</span></button>
+            </div>
+          </section>
+        )}
 
-      {fuente === 'imagen' && (
-        <section className="panel-section">
-          <h2>Imagen</h2>
-          <p>Usa un archivo local o una URL directa.</p>
-          <div className="stack">
-            <button type="button" className="secondary-action" onClick={onInsertImage} disabled={locked}><Icon name="image" size={16} /><span>Añadir imagen</span></button>
-            <button type="button" className="secondary-action" onClick={onImageUrl} disabled={locked}><Icon name="link" size={16} /><span>Desde URL</span></button>
-          </div>
-        </section>
-      )}
+        {fuente === 'imagen' && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h2 className="gp-title">Imagen</h2>
+            <p className="gp-hint">Usa un archivo local o una URL directa.</p>
+            <button type="button" className="gp-btn" onClick={onInsertImage} disabled={locked}><Icon name="image" size={16} /><span>Añadir imagen</span></button>
+            <button type="button" className="gp-btn" onClick={onImageUrl} disabled={locked}><Icon name="link" size={16} /><span>Desde URL</span></button>
+          </section>
+        )}
 
-      {fuente === 'campos' && (
-        <section className="panel-section">
-          <h2>Campos</h2>
-          <p>Escribe <code>[nombre]</code> en el texto de una capa para crear un campo dinámico.</p>
-          <form className="field-form" onSubmit={agregarCampo}>
-            <input value={nuevoCampo} onChange={(event) => setNuevoCampo(event.target.value)} placeholder="nombre" aria-label="Nombre del nuevo campo" />
-            <button type="submit" disabled={locked || !normalizarNombreCampo(nuevoCampo) || Boolean(fields[normalizarNombreCampo(nuevoCampo)])}><Icon name="plus" size={16} /></button>
-          </form>
-          <p className="hint">Ejemplo: <code>[cliente]</code></p>
-          <div className="field-list">
+        {fuente === 'campos' && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h2 className="gp-title">Campos</h2>
+            <p className="gp-hint">Escribe <code>[nombre]</code> en el texto de una capa para crear un campo dinámico.</p>
+            <form className="gp-row" onSubmit={agregarCampo}>
+              <input className="gp-input" value={nuevoCampo} onChange={(event) => setNuevoCampo(event.target.value)} placeholder="nombre" aria-label="Nombre del nuevo campo" />
+              <button className="gp-icon-btn" type="submit" disabled={locked || !normalizarNombreCampo(nuevoCampo) || Boolean(fields[normalizarNombreCampo(nuevoCampo)])} title="Añadir campo"><Icon name="plus" size={16} /></button>
+            </form>
+            <p className="gp-hint">Ejemplo: <code>[cliente]</code></p>
             {campos.map((campo) => (
-              <article key={campo.nombre} className="field-card">
-                <header>
+              <article key={campo.nombre} className="gp-card">
+                <header className="gp-card-head">
                   <strong>{campo.nombre}</strong>
-                  <span className={`badge ${campo.tipo}`}>{campo.tipo}</span>
+                  <span className={`gp-badge ${campo.tipo}`}>{campo.tipo}</span>
                 </header>
-                <input value={campo.defaultValue ?? ''} onChange={(event) => setFieldDefault(campo.nombre, event.target.value)} placeholder="Valor por defecto" aria-label={`Valor por defecto de ${campo.nombre}`} />
-                <div className="field-actions">
-                  <button type="button" onClick={() => {
+                <input className="gp-input" value={campo.defaultValue ?? ''} onChange={(event) => setFieldDefault(campo.nombre, event.target.value)} placeholder="Valor por defecto" aria-label={`Valor por defecto de ${campo.nombre}`} />
+                <div className="gp-actions">
+                  <button type="button" className="gp-icon-btn" title="Insertar en la capa seleccionada" disabled={locked || !campoSeleccionado} onClick={() => {
                     const capa = campoSeleccionado;
                     if (!capa) return;
                     if (capa.tipo === 'texto') useTemplateStore.getState().updateObject(capa.id, { texto: { ...capa.texto, texto: `${capa.texto?.texto ?? ''}[${campo.nombre}]` } });
                     if (capa.tipo === 'imagen') useTemplateStore.getState().updateObject(capa.id, { imagen: { ...capa.imagen, src: `[${campo.nombre}]` } });
-                  }} disabled={locked || !campoSeleccionado} title="Insertar en la capa seleccionada"><Icon name="plus" size={16} /></button>
-                  <button type="button" onClick={() => {
+                  }}><Icon name="plus" size={15} /></button>
+                  <button type="button" className="gp-icon-btn" title="Renombrar campo" disabled={locked} onClick={() => {
                     const nombre = window.prompt('Nuevo nombre del campo', campo.nombre);
                     if (nombre) renameField(campo.nombre, normalizarNombreCampo(nombre));
-                  }} disabled={locked} title="Renombrar campo"><Icon name="edit" size={16} /></button>
-                  <button type="button" onClick={() => removeField(campo.nombre)} disabled={locked} title="Eliminar campo"><Icon name="trash" size={16} /></button>
+                  }}><Icon name="edit" size={15} /></button>
+                  <button type="button" className="gp-icon-btn" title="Eliminar campo" disabled={locked} onClick={() => removeField(campo.nombre)}><Icon name="trash" size={15} /></button>
                 </div>
               </article>
             ))}
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
-      {fuente === 'hoja' && (
-        <section className="panel-section">
-          <h2>Hoja de cálculo</h2>
-          {sheets.status === 'disconnected' && (
-            <div className="stack">
-              <p>Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
-              <input value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
-              <button type="button" className="primary-action" onClick={conectarHoja}><Icon name="sheet" size={16} /><span>Conectar hoja</span></button>
-            </div>
-          )}
-          {sheets.status === 'loading' && <p>Cargando hoja…</p>}
-          {sheets.status === 'error' && <p className="error-text">No se pudo cargar la hoja. Revisa que sea pública o que tengas acceso.</p>}
-          {sheets.status === 'ready' && (
-            <div className="stack">
-              <div className="sheet-summary">
-                <strong>{sheets.title}</strong>
-                <span>{sheets.rows.length} filas</span>
+        {fuente === 'hoja' && (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h2 className="gp-title">Hoja de cálculo</h2>
+            {sheets.status === 'disconnected' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p className="gp-hint">Pega la URL de una hoja de Google Sheets publicada o accesible.</p>
+                <input className="gp-input" value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} placeholder="https://docs.google.com/spreadsheets/..." aria-label="URL de Google Sheets" />
+                <button type="button" className="gp-btn primary" onClick={conectarHoja}><Icon name="sheet" size={16} /><span>Conectar hoja</span></button>
               </div>
-              <div className="mapping-list">
-                {sheets.headers.map((columna) => (
-                  <label key={columna} className="mapping-row">
-                    <span>{columna}</span>
-                    <select value={sheets.columnToField[columna] ?? ''} onChange={(event) => setColumnField(columna, event.target.value)}>
-                      <option value="">Sin mapear</option>
-                      {campos.map((campo) => <option key={campo.nombre} value={campo.nombre}>{`[${campo.nombre}]`}</option>)}
-                    </select>
-                  </label>
-                ))}
+            )}
+            {sheets.status === 'loading' && <p className="gp-hint">Cargando hoja…</p>}
+            {sheets.status === 'error' && <p className="gp-error">No se pudo cargar la hoja. Revisa que sea pública o que tengas acceso.</p>}
+            {sheets.status === 'ready' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="gp-summary">
+                  <strong>{sheets.title}</strong>
+                  <span>{sheets.rows.length} filas</span>
+                </div>
+                <div className="gp-map">
+                  {sheets.headers.map((columna) => (
+                    <label key={columna} className="gp-map-row">
+                      <span>{columna}</span>
+                      <select className="gp-select" value={sheets.columnToField[columna] ?? ''} onChange={(event) => setColumnField(columna, event.target.value)}>
+                        <option value="">Sin mapear</option>
+                        {campos.map((campo) => <option key={campo.nombre} value={campo.nombre}>{`[${campo.nombre}]`}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <label className="gp-map-row">
+                  <span>Fila activa</span>
+                  <select className="gp-select" value={sheets.activeRowIndex} onChange={(event) => setActiveRowIndex(Number(event.target.value))}>
+                    {sheets.rows.map((_, indice) => <option key={indice} value={indice}>{indice + 1}</option>)}
+                  </select>
+                </label>
+                <button type="button" className="gp-btn" onClick={() => connectSheet().catch(() => {})}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
+                <button type="button" className="gp-btn primary" onClick={onGenerarLote} disabled={locked}><Icon name="download" size={16} /><span>Generar lote</span></button>
               </div>
-              <label className="mapping-row">
-                <span>Fila activa</span>
-                <select value={sheets.activeRowIndex} onChange={(event) => setActiveRowIndex(Number(event.target.value))}>
-                  {sheets.rows.map((_, indice) => <option key={indice} value={indice}>{indice + 1}</option>)}
-                </select>
-              </label>
-              <div className="stack">
-                <button type="button" className="secondary-action" onClick={() => connectSheet().catch(() => setSheetStatus('error'))}><Icon name="refresh" size={16} /><span>Actualizar datos</span></button>
-                <button type="button" className="primary-action" onClick={onGenerarLote} disabled={locked}><Icon name="download" size={16} /><span>Generar lote</span></button>
+            )}
+            {loteEstado.estado !== 'idle' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {loteEstado.estado === 'generando' && (
+                  <>
+                    <div className="gp-progress"><div style={{ width: `${progreso}%` }} /></div>
+                    <p className="gp-hint">{loteEstado.actual} / {loteEstado.total} imágenes</p>
+                    <button type="button" className="gp-btn" onClick={onCancelarLote}>Cancelar</button>
+                  </>
+                )}
+                {loteEstado.estado === 'listo' && <p className="gp-success">Listo: {loteEstado.exitosos} de {loteEstado.total} imágenes.</p>}
+                {loteEstado.estado === 'error' && <p className="gp-error">{loteEstado.error}</p>}
+                {loteEstado.fallidos.length > 0 && loteEstado.estado !== 'generando' && (
+                  <button type="button" className="gp-btn" onClick={() => onReintentarLote(loteEstado.fallidos.map((fila) => fila - 1))}><Icon name="refresh" size={16} /><span>Reintentar {loteEstado.fallidos.length} fila(s)</span></button>
+                )}
               </div>
-            </div>
-          )}
-          {loteEstado.estado !== 'idle' && (
-            <div className="batch-status">
-              {loteEstado.estado === 'generando' && (
-                <>
-                  <div className="progress"><div style={{ width: `${progreso}%` }} /></div>
-                  <p>{loteEstado.actual} / {loteEstado.total} imágenes</p>
-                  <button type="button" onClick={onCancelarLote}>Cancelar</button>
-                </>
-              )}
-              {loteEstado.estado === 'listo' && <p className="success-text">Listo: {loteEstado.exitosos} de {loteEstado.total} imágenes.</p>}
-              {loteEstado.estado === 'error' && <p className="error-text">{loteEstado.error}</p>}
-              {loteEstado.fallidos.length > 0 && loteEstado.estado !== 'generando' && (
-                <button type="button" className="secondary-action" onClick={() => onReintentarLote(loteEstado.fallidos.map((fila) => fila - 1))}><Icon name="refresh" size={16} /><span>Reintentar {loteEstado.fallidos.length} fila(s)</span></button>
-              )}
-            </div>
-          )}
-        </section>
-      )}
+            )}
+          </section>
+        )}
+      </div>
     </aside>
   );
 }
