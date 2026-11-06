@@ -8,6 +8,7 @@ import { Icon } from '../components/Icons.jsx';
 import { obtenerCajaTexto, useTemplateStore } from '../state/template-store.js';
 import { clamp, esFillOscuro, konvaFillProps } from '../template/schema.js';
 import { valoresDeFila } from '../sheets/mapper.js';
+import { descargarDataUrl } from '../template/persistencia.js';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
@@ -47,6 +48,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const addGuide = useTemplateStore((state) => state.addGuide);
 
   const holderRef = useRef(null);
+  const stageRef = useRef(null);
   const objectGroupRef = useRef(null);
   const transformerRef = useRef(null);
   const nodeRefs = useRef({});
@@ -65,6 +67,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const [draftGuide, setDraftGuide] = useState(null);
   const [smartGuides, setSmartGuides] = useState([]);
   const [editingTextId, setEditingTextId] = useState(null);
+  const [exportando, setExportando] = useState(false);
   canvasRef.current = canvas;
 
   const fieldsPreview = useMemo(() => {
@@ -107,12 +110,38 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     changeView({ x: point.x - worldX * newScale, y: point.y - worldY * newScale, scale: newScale });
   }, [changeView]);
 
+  const exportarPNG = useCallback(async ({ pixelRatio = 2 } = {}) => {
+    const stage = stageRef.current;
+    const currentCanvas = canvasRef.current;
+    if (!stage || !currentCanvas) throw new Error('El lienzo aún no está listo.');
+
+    setExportando(true);
+    // Espera dos frames para que Konva aplique el estado de exportación sin guías.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    try {
+      const dataUrl = stage.toDataURL({
+        x: 0,
+        y: 0,
+        width: currentCanvas.width,
+        height: currentCanvas.height,
+        pixelRatio: clamp(pixelRatio, 1, 4),
+        mimeType: 'image/png',
+      });
+      const base = String(projectName || 'plantilla').trim().replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'plantilla';
+      descargarDataUrl(dataUrl, `${base}.png`);
+      return dataUrl;
+    } finally {
+      setExportando(false);
+    }
+  }, [projectName]);
+
   useImperativeHandle(ref, () => ({
     fitToScreen,
+    exportarPNG,
     zoom100: () => zoomAtPoint(1, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
     zoomIn: () => zoomAtPoint(viewRef.current.scale * 1.2, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
     zoomOut: () => zoomAtPoint(viewRef.current.scale / 1.2, { x: sizeRef.current.width / 2, y: sizeRef.current.height / 2 }),
-  }), [fitToScreen, zoomAtPoint]);
+  }), [exportarPNG, fitToScreen, zoomAtPoint]);
 
   useLayoutEffect(() => {
     const holder = holderRef.current;
@@ -504,6 +533,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         >
           {size.width > 0 && size.height > 0 && (
             <Stage
+              ref={stageRef}
               width={size.width}
               height={size.height}
               x={view.x}
@@ -530,7 +560,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                   shadowOffsetY={10}
                 />
               </Layer>
-              <Layer>
+              <Layer listening={false} visible={!exportando}>
                 <ManualGuides canvas={canvas} zoom={view.scale} draftGuide={draftGuide} />
               </Layer>
               <Layer>
@@ -562,7 +592,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
                   onTransformEnd={transformEnd}
                 />
               </Layer>
-              <Layer>
+              <Layer listening={false} visible={!exportando}>
                 <SmartGuides canvas={canvas} zoom={view.scale} smartGuides={smartGuides} />
               </Layer>
             </Stage>

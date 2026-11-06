@@ -16,6 +16,7 @@ export default function TopBar({
   onInsertImage,
   onOpenTemplate,
   onSaveTemplate,
+  onExportPng,
 }) {
   const nombre = useTemplateStore((state) => state.template.nombre);
   const canvas = useTemplateStore((state) => state.template.canvas);
@@ -95,12 +96,15 @@ export default function TopBar({
         <button type="button" className="zoom-100" onClick={onZoom100} title="Ajustar al 100 %">100%</button>
         <button type="button" className="icon-button fit-button" onClick={onFit} aria-label="Ajustar a pantalla" title="Ajustar a pantalla"><Icon name="fit" size={17} /></button>
       </div>
-      <div className="project-actions" aria-label="Guardar y abrir plantilla">
+      <div className="project-actions" aria-label="Guardar, abrir y exportar">
         <button type="button" className="icon-button" onClick={onOpenTemplate} aria-label="Abrir plantilla JSON" title="Abrir plantilla JSON">
           <Icon name="folder" size={16} />
         </button>
         <button type="button" className="icon-button" onClick={onSaveTemplate} aria-label="Guardar plantilla como archivo JSON" title="Guardar plantilla como archivo JSON">
           <Icon name="download" size={16} />
+        </button>
+        <button type="button" className="icon-button" onClick={onExportPng} aria-label="Exportar lienzo como PNG" title="Exportar lienzo como PNG (2x)">
+          <Icon name="image" size={16} />
         </button>
       </div>
       <button type="button" className="new-project-button" onClick={onNewProject} aria-label="Nuevo proyecto">

@@ -58,6 +58,15 @@ export function descargarPlantilla(template, fields, nombreProyecto) {
   URL.revokeObjectURL(url);
 }
 
+export function descargarDataUrl(dataUrl, nombreArchivo) {
+  const enlace = document.createElement('a');
+  enlace.href = dataUrl;
+  enlace.download = nombreArchivo;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+}
+
 export function parsearPlantilla(texto) {
   let datos;
   try {

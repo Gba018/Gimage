@@ -154,6 +154,12 @@ export default function App() {
         return;
       }
 
+      if (mod && !event.altKey && keyLower === 'e') {
+        event.preventDefault();
+        exportarPng();
+        return;
+      }
+
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
         state.deleteSelected();
@@ -259,6 +265,20 @@ export default function App() {
     setNotice({ type: 'success', text: 'Plantilla descargada como archivo JSON.' });
   };
 
+  const exportarPng = async () => {
+    try {
+      await canvasRef.current?.exportarPNG({ pixelRatio: 2 });
+      setNotice({ type: 'success', text: 'Lienzo exportado como PNG en 2x.' });
+    } catch (error) {
+      setNotice({
+        type: 'error',
+        text: error.message === 'Failed to execute \'toDataURL\' on \'HTMLCanvasElement\': Tainted canvases may not be exported.'
+          ? 'No se pudo exportar: una imagen externa no permite CORS. Reemplázala por una imagen local o de un servidor con CORS.'
+          : error.message || 'No se pudo exportar el PNG.',
+      });
+    }
+  };
+
   const insertText = () => insertObject('texto');
   const insertRect = () => insertObject('rect');
   const insertCircle = () => insertObject('circulo');
@@ -298,6 +318,7 @@ export default function App() {
         onInsertImage={insertImage}
         onOpenTemplate={() => templateInputRef.current?.click()}
         onSaveTemplate={guardarArchivo}
+        onExportPng={exportarPng}
       />
       <div className="editor-body">
         <LeftPanel
