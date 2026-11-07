@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Icon } from '../Icons.jsx';
 import { useTemplateStore } from '../../state/template-store.js';
 
@@ -19,6 +19,8 @@ export default function LayersPanel({ locked }) {
   const template = useTemplateStore((state) => state.template);
   const selectedIds = useTemplateStore((state) => state.selectedIds);
   const selectLayer = useTemplateStore((state) => state.selectLayer);
+  const setSelectedIds = useTemplateStore((state) => state.setSelectedIds);
+  const clearSelection = useTemplateStore((state) => state.clearSelection);
   const renameLayer = useTemplateStore((state) => state.renameLayer);
   const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
   const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
@@ -28,6 +30,9 @@ export default function LayersPanel({ locked }) {
   const [dropIndex, setDropIndex] = useState(null);
   const [editandoId, setEditandoId] = useState(null);
   const [nombreDraft, setNombreDraft] = useState('');
+  const anclaSeleccion = useRef(null);
+
+  const capas = template.capas;
 
   function iniciarRenombre(capa) {
     setEditandoId(capa.id);
@@ -44,15 +49,90 @@ export default function LayersPanel({ locked }) {
     setEditandoId(null);
   }
 
+  function seleccionarRango(desde, hasta) {
+    const inicio = Math.min(desde, hasta);
+    const fin = Math.max(desde, hasta);
+    const ids = capas.slice(inicio, fin + 1).map((capa) => capa.id);
+    setSelectedIds(ids);
+  }
+
+  function manejarClicCapa(event, capa, index) {
+    if (locked) return;
+
+    if (event.metaKey || event.ctrlKey) {
+      selectLayer(capa.id, true);
+      anclaSeleccion.current = index;
+      return;
+    }
+
+    if (event.shiftKey && anclaSeleccion.current != null) {
+      seleccionarRango(anclaSeleccion.current, index);
+      return;
+    }
+
+    selectLayer(capa.id);
+    anclaSeleccion.current = index;
+  }
+
+  function moverSeleccion(delta, extender) {
+    const total = capas.length;
+    if (!total) return;
+
+    const ancla = anclaSeleccion.current ?? 0;
+    const destino = Math.min(total - 1, Math.max(0, ancla + delta));
+
+    if (extender) {
+      seleccionarRango(ancla, destino);
+      return;
+    }
+
+    selectLayer(capas[destino].id);
+    anclaSeleccion.current = destino;
+  }
+
+  function manejarTeclado(event) {
+    if (locked) return;
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      setSelectedIds(capas.map((capa) => capa.id));
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      clearSelection();
+      anclaSeleccion.current = null;
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moverSeleccion(-1, event.shiftKey);
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moverSeleccion(1, event.shiftKey);
+    }
+  }
+
   return (
     <section>
       <h2>Capas</h2>
       <p className="gp-hint">Orden de apilado · arriba = delante. Arrastra para reordenar.</p>
-      <div className="gp-layers" role="list" aria-label="Pila de capas">
+      <div
+        className="gp-layers"
+        role="list"
+        aria-label="Pila de capas"
+        tabIndex={0}
+        onKeyDown={manejarTeclado}
+      >
         {dropIndex != null && (
           <div className="gp-drop-line" style={{ top: dropIndex * 32 - 1 }} aria-hidden="true" />
         )}
-        {template.capas.map((capa, index) => {
+        {capas.map((capa, index) => {
           const seleccionada = selectedIds.includes(capa.id);
           const editando = editandoId === capa.id;
           return (
@@ -63,6 +143,7 @@ export default function LayersPanel({ locked }) {
               aria-label={`Capa: ${capa.nombre}`}
               className={`gp-layer ${seleccionada ? 'gp-selected' : ''} ${capa.visible ? '' : 'gp-hidden'} ${dragIndex === index ? 'gp-dragging' : ''}`}
               draggable={!locked && !editando}
+              onClick={(event) => manejarClicCapa(event, capa, index)}
               onDragStart={(event) => {
                 setDragIndex(index);
                 event.dataTransfer.effectAllowed = 'move';
@@ -108,7 +189,7 @@ export default function LayersPanel({ locked }) {
                   type="button"
                   className="gp-layer-name"
                   disabled={locked}
-                  onClick={() => selectLayer(capa.id)}
+                  onClick={(event) => manejarClicCapa(event, capa, index)}
                   onDoubleClick={() => iniciarRenombre(capa)}
                 >
                   {capa.nombre}
