@@ -5,6 +5,7 @@ import { cargarImagen } from './canvas/image-loader.js';
 import CropDialog from './components/CropDialog.jsx';
 import ImageDialog from './components/ImageDialog.jsx';
 import ProjectDialog from './components/ProjectDialog.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import LeftPanel from './panels/LeftPanel.jsx';
 import RightPanel from './panels/RightPanel.jsx';
 import TopBar from './panels/TopBar.jsx';
@@ -127,18 +128,22 @@ export default function App() {
   const insertarImagen = () => useTemplateStore.getState().insertObject('imagen', { src: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#e5e7eb"/></svg>'), naturalWidth: 800, naturalHeight: 600 });
   const close = () => { reemplazo.current = null; setDialog(null); };
   const crop = template.capas.find(c => c.id === cropLayerId && c.tipo === 'imagen');
-  return <div className="app-shell">
-    <TopBar zoom={zoom} disabled={locked} diagnostico={diagnostico} onZoomIn={() => canvasRef.current?.zoomIn()} onZoomOut={() => canvasRef.current?.zoomOut()} onZoom100={() => canvasRef.current?.zoom100()} onFit={() => canvasRef.current?.fitToScreen()} onNewProject={() => setDialog('project')} onInsertText={() => insertar('texto')} onInsertRect={() => insertar('rect')} onInsertCircle={() => insertar('circulo')} onInsertLine={() => insertar('linea')} onInsertImage={insertarImagen} onOpenTemplate={() => templateInputRef.current?.click()} onSaveTemplate={guardar} onExportPng={exportar} />
-    <div className="editor-body">
-      <LeftPanel onInsertText={() => insertar('texto')} onInsertRect={() => insertar('rect')} onInsertCircle={() => insertar('circulo')} onInsertLine={() => insertar('linea')} onInsertImage={insertarImagen} onImageUrl={() => { reemplazo.current = null; setDialog('image'); }} onGenerarLote={generarLote} onCancelarLote={() => { cancelar.current = true; }} onReintentarLote={generarLote} onActualizarDatos={() => window.dispatchEvent(new CustomEvent('gimage:actualizar-sheets'))} loteEstado={loteEstado} locked={locked} />
-      <CanvasStage ref={canvasRef} spacePressed={spacePressed} onZoomChange={setZoom} onFitLimit={() => setNotice('El zoom mínimo es 25 %. Puedes desplazarte para ver el resto.')} />
-      <RightPanel onReplaceImageFile={id => { reemplazo.current = id; fileInputRef.current?.click(); }} onReplaceImageUrl={id => { reemplazo.current = id; setDialog('image'); }} onOpenCrop={setCropLayerId} />
-    </div>
-    <input ref={fileInputRef} className="visually-hidden" type="file" accept="image/*" aria-label="Seleccionar imagen" onChange={async e => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; try { const src = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); }); await imagen(src); } catch (err) { setNotice(err.message || 'No se pudo cargar la imagen.'); } }} />
-    <input ref={templateInputRef} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Abrir plantilla" onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const r = useTemplateStore.getState().importarPlantilla(await f.text()); setNotice(r.ok ? 'Plantilla abierta.' : r.error); } catch (err) { setNotice(err.message); } }} />
-    {dialog === 'project' && <ProjectDialog onClose={close} />}
-    {dialog === 'image' && <ImageDialog onClose={close} onAdd={imagen} />}
-    {crop && <CropDialog layer={crop} onClose={() => setCropLayerId(null)} onApply={valor => useTemplateStore.getState().updateObject(crop.id, { imagen: valor })} />}
-    {notice && <div className="toast toast-warning" role="status">{notice}<button type="button" onClick={() => setNotice('')}>Cerrar</button></div>}
-  </div>;
+  return (
+    <ErrorBoundary>
+      <div className="app-shell">
+        <TopBar zoom={zoom} disabled={locked} diagnostico={diagnostico} onZoomIn={() => canvasRef.current?.zoomIn()} onZoomOut={() => canvasRef.current?.zoomOut()} onZoom100={() => canvasRef.current?.zoom100()} onFit={() => canvasRef.current?.fitToScreen()} onNewProject={() => setDialog('project')} onInsertText={() => insertar('texto')} onInsertRect={() => insertar('rect')} onInsertCircle={() => insertar('circulo')} onInsertLine={() => insertar('linea')} onInsertImage={insertarImagen} onOpenTemplate={() => templateInputRef.current?.click()} onSaveTemplate={guardar} onExportPng={exportar} />
+        <div className="editor-body">
+          <LeftPanel onInsertText={() => insertar('texto')} onInsertRect={() => insertar('rect')} onInsertCircle={() => insertar('circulo')} onInsertLine={() => insertar('linea')} onInsertImage={insertarImagen} onImageUrl={() => { reemplazo.current = null; setDialog('image'); }} onGenerarLote={generarLote} onCancelarLote={() => { cancelar.current = true; }} onReintentarLote={generarLote} onActualizarDatos={() => window.dispatchEvent(new CustomEvent('gimage:actualizar-sheets'))} loteEstado={loteEstado} locked={locked} />
+          <CanvasStage ref={canvasRef} spacePressed={spacePressed} onZoomChange={setZoom} onFitLimit={() => setNotice('El zoom mínimo es 25 %. Puedes desplazarte para ver el resto.')} />
+          <RightPanel onReplaceImageFile={id => { reemplazo.current = id; fileInputRef.current?.click(); }} onReplaceImageUrl={id => { reemplazo.current = id; setDialog('image'); }} onOpenCrop={setCropLayerId} />
+        </div>
+        <input ref={fileInputRef} className="visually-hidden" type="file" accept="image/*" aria-label="Seleccionar imagen" onChange={async e => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; try { const src = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); }); await imagen(src); } catch (err) { setNotice(err.message || 'No se pudo cargar la imagen.'); } }} />
+        <input ref={templateInputRef} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Abrir plantilla" onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const r = useTemplateStore.getState().importarPlantilla(await f.text()); setNotice(r.ok ? 'Plantilla abierta.' : r.error); } catch (err) { setNotice(err.message); } }} />
+        {dialog === 'project' && <ProjectDialog onClose={close} />}
+        {dialog === 'image' && <ImageDialog onClose={close} onAdd={imagen} />}
+        {crop && <CropDialog layer={crop} onClose={() => setCropLayerId(null)} onApply={valor => useTemplateStore.getState().updateObject(crop.id, { imagen: valor })} />}
+        {notice && <div className="toast toast-warning" role="status">{notice}<button type="button" onClick={() => setNotice('')}>Cerrar</button></div>}
+      </div>
+    </ErrorBoundary>
+  );
 }
