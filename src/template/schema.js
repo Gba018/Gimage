@@ -5,6 +5,7 @@ const HEX_LARGO = /^#?([0-9a-f]{6})$/i;
 
 export const MIN_AUTO_FIT_FONT_SIZE = 8;
 export const MODOS_OVERFLOW_TEXTO = ['ajustar', 'recortar', 'libre'];
+export const MODOS_FUSION_CAPA = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
 export const DEFAULT_TEXT_BOX = {
   width: 500,
   height: 120,
@@ -205,8 +206,8 @@ export function konvaFillProps(fill, { minX = 0, minY = 0, width = 1, height = 1
       fillPriority: 'radial-gradient',
       fill: '',
       fillRadialGradientStartPoint: { x: px, y: py },
-      fillRadialGradientEndPoint: { x: px, y: py },
       fillRadialGradientStartRadius: 0,
+      fillRadialGradientEndPoint: { x: px, y: py },
       fillRadialGradientEndRadius: endRadius,
       fillRadialGradientColorStops: flatStops,
       fillLinearGradientColorStops: null,
@@ -225,6 +226,28 @@ export function normalizarStroke(stroke, colorRespaldo = '#222222', anchoRespald
   return {
     color: normalizarHex(stroke?.color, colorRespaldo),
     width: Math.max(0, Math.round(Number.isFinite(Number(stroke?.width)) ? Number(stroke.width) : anchoRespaldo)),
+  };
+}
+
+export function normalizarMetadatosCapa(capa, indice = 0) {
+  const parentId = typeof capa?.parentId === 'string' && capa.parentId ? capa.parentId : null;
+  const blendMode = MODOS_FUSION_CAPA.includes(capa?.blendMode) ? capa.blendMode : 'normal';
+  const fill = Number.isFinite(Number(capa?.fill)) ? clamp(Number(capa.fill), 0, 1) : 1;
+  const effects = Array.isArray(capa?.effects) ? capa.effects : [];
+  const linkedLayerIds = Array.isArray(capa?.linkedLayerIds)
+    ? capa.linkedLayerIds.filter((id) => typeof id === 'string' && id)
+    : [];
+
+  return {
+    ...capa,
+    parentId,
+    order: Number.isInteger(capa?.order) ? capa.order : indice,
+    collapsed: Boolean(capa?.collapsed),
+    blendMode,
+    fill,
+    mask: capa?.mask ?? null,
+    effects,
+    linkedLayerIds,
   };
 }
 
@@ -466,13 +489,14 @@ export function hidratarPlantilla(plantillaEntrada) {
   const canvasFill = normalizarFill(plantillaEntrada.canvas?.background?.fill, '#ffffff');
   const capasEntrada = Array.isArray(plantillaEntrada.capas) ? plantillaEntrada.capas : [];
 
-  const capas = capasEntrada.map((capa) => {
-    const tipo = normalizarTipoCapa(capa.tipo);
-    if (tipo !== 'texto' || !capa.texto) return { ...capa, tipo };
-    const caja = normalizarCajaTexto(capa.texto.caja, capa.texto);
-    const fontSizeBase = Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(capa.texto.fontSize) || 48));
+  const capas = capasEntrada.map((capa, indice) => {
+    const base = normalizarMetadatosCapa(capa, indice);
+    const tipo = normalizarTipoCapa(base.tipo);
+    if (tipo !== 'texto' || !base.texto) return base;
+    const caja = normalizarCajaTexto(base.texto.caja, base.texto);
+    const fontSizeBase = Math.max(MIN_AUTO_FIT_FONT_SIZE, Math.round(Number(base.texto.fontSize) || 48));
     const textoNormalizado = {
-      ...capa.texto,
+      ...base.texto,
       fontSize: fontSizeBase,
       caja,
     };
@@ -480,7 +504,7 @@ export function hidratarPlantilla(plantillaEntrada) {
       textoNormalizado.fontSize = calcularFontSizeAutoFit(textoNormalizado, caja.width, caja.height);
     }
     return {
-      ...capa,
+      ...base,
       tipo,
       texto: textoNormalizado,
     };
@@ -523,6 +547,14 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
     y: 0,
     rotation: 0,
     opacity: 1,
+    parentId: null,
+    order: (plantilla.capas || []).length,
+    collapsed: false,
+    blendMode: 'normal',
+    fill: 1,
+    mask: null,
+    effects: [],
+    linkedLayerIds: [],
   };
 
   const cx = plantilla.canvas.width / 2;
