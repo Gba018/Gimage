@@ -63,3 +63,19 @@ export function esDescendiente(capas, ancestroId, id) {
   if (!ancestroId || !id || ancestroId === id) return false;
   return getDescendantIds(capas, ancestroId).includes(id);
 }
+
+export function puedeMoverCapa(capas, origenId, targetId, posicion) {
+  if (!Array.isArray(capas)) return false;
+  const origen = getLayerById(capas, origenId);
+  const target = getLayerById(capas, targetId);
+  if (!origen || !target || origenId === targetId) return false;
+
+  if (posicion === 'inside') {
+    if (target.tipo !== 'grupo') return false;
+    if (esDescendiente(capas, origenId, targetId)) return false;
+    return true;
+  }
+
+  if ((origen.parentId ?? null) !== (target.parentId ?? null)) return false;
+  return posicion === 'before' || posicion === 'after';
+}

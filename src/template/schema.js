@@ -320,6 +320,8 @@ const ALIAS_TIPOS = {
   text: 'texto',
   imagen: 'imagen',
   image: 'imagen',
+  grupo: 'grupo',
+  group: 'grupo',
 };
 
 export function normalizarTipoCapa(tipo) {
@@ -530,6 +532,7 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
     linea: 'Línea',
     texto: 'Texto',
     imagen: 'Imagen',
+    grupo: 'Grupo',
   };
   if (!nombresBase[tipo]) {
     throw new Error(`Tipo de capa no admitido: ${tipoEntrada}`);
@@ -556,6 +559,10 @@ export function crearCapa(tipoEntrada, plantilla, opciones = {}) {
     effects: [],
     linkedLayerIds: [],
   };
+
+  if (tipo === 'grupo') {
+    return capa;
+  }
 
   const cx = plantilla.canvas.width / 2;
   const cy = plantilla.canvas.height / 2;

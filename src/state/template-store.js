@@ -4,39 +4,26 @@ import { extraerCamposPlantilla, normalizarNombreCampo, renombrarCampoEnCapas, r
 import { extraerSpreadsheetId, leerHoja } from '../sheets/sheets-client.js';
 import { normalizarRespuestaValues } from '../sheets/mapper.js';
 import { guardarPlantillaLocal, leerPlantillaLocal, parsearPlantilla } from '../template/persistencia.js';
+import { esDescendiente, puedeMoverCapa } from './layers-selectors.js';
 
 const MAX_HISTORIAL = 100;
 const VENTANA_COALESCENCIA_MS = 350;
 const SHEETS_API_KEY_STORAGE = 'gimage_sheets_api_key';
 function clonar(valor) { return typeof globalThis.structuredClone === 'function' ? globalThis.structuredClone(valor) : JSON.parse(JSON.stringify(valor)); }
-function leerApiKeyGuardada() { return typeof localStorage === 'undefined' ? '' : localStorage.getItem(SHEETS_API_KEY_STORAGE) || ''; }
+function leerApiKeyGuardada() { if (typeof localStorage === 'undefined') return ''; return localStorage.getItem(SHEETS_API_KEY_STORAGE) ?? ''; }
 function guardarApiKey(apiKey) { if (typeof localStorage === 'undefined') return; if (apiKey) localStorage.setItem(SHEETS_API_KEY_STORAGE, apiKey); else localStorage.removeItem(SHEETS_API_KEY_STORAGE); }
-function traducirErrorSheets(error) {
-  const mensaje = String(error?.message ?? '');
-  if (/API key not valid|API_KEY_INVALID|invalid API key/i.test(mensaje)) return 'La API key no es válida o no tiene habilitada la Google Sheets API.';
-  if (/PERMISSION_DENIED|403/i.test(mensaje)) return 'No se pudo leer la hoja: compártela como “Cualquier persona con el enlace puede ver”.';
-  if (/Unable to parse range|400/i.test(mensaje)) return 'No se pudo leer el rango indicado. Revisa el nombre de la pestaña y el rango.';
-  if (/not found|404/i.test(mensaje)) return 'No se encontró la hoja: revisa el ID o la URL.';
-  return mensaje || 'No se pudo leer la hoja.';
-}
+function traducirErrorSheets(error) { const mensaje = String(error?.message ?? ''); if (/API key not valid|API_KEY_INVALID|invalid API key/i.test(mensaje)) return 'La API key no es válida o no tiene habilitada la Google Sheets API.'; if (/PERMISSION_DENIED|403/i.test(mensaje)) return 'No se pudo leer la hoja: compártela como “Cualquier persona con el enlace puede ver”.'; if (/Unable to parse range|400/i.test(mensaje)) return 'No se pudo leer la hoja: revisa el nombre de la pestaña y el rango.'; return mensaje; }
 export function obtenerCajaTexto(capa) { if (!capa || capa.tipo !== 'texto') return null; return normalizarCajaTexto(capa.texto?.caja, capa.texto); }
-function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) {
-  if (!capa || capa.tipo !== 'texto' || !capa.texto) return capa;
-  const cajaBase = obtenerCajaTexto(capa);
-  const caja = cambioCaja ? sincronizarCambioCajaTexto(cajaBase, cambioCaja) : cajaBase;
-  const textoParaMedir = resolverTexto(capa.texto.texto, fields);
-  const fontSizeCalculado = caja.autoFit ? calcularFontSizeAutoFit({ ...capa.texto, texto:textoParaMedir }, caja.width, caja.height) : capa.texto.fontSize;
-  return { ...capa, texto:{ ...capa.texto, fontSize:fontSizeCalculado, caja } };
-}
+function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) { if (!capa || capa.tipo !== 'texto' || !capa.texto) return capa; const cajaBase = obtenerCajaTexto(capa); const caja = cambioCaja ? sincronizarCambioCajaTexto(cajaBase, cambioCaja) : cajaBase; const textoParaMedir = resolverTexto(capa.texto.texto, fields); const fontSizeCalculado = caja.autoFit ? calcularFontSizeAutoFit({ ...capa.texto, texto:textoParaMedir }, caja.width, caja.height) : capa.texto.fontSize; return { ...capa, texto:{ ...capa.texto, fontSize:fontSizeCalculado, caja } }; }
 function crearSnapshot(state) { return { template:clonar(state.template), selectedIds:[...state.selectedIds], fields:clonar(state.fields) }; }
 function filtrarSeleccionValida(capas, selectedIds) { const ids = new Set(capas.map((capa) => capa.id)); return selectedIds.filter((id) => ids.has(id)); }
 export function cajaCapa(capa) {
   if (!capa) return { x:0, y:0, width:0, height:0 };
-  if (capa.tipo === 'texto') { const caja = obtenerCajaTexto(capa) ?? { width:0, height:0 }; return { x:capa.x, y:capa.y, width:caja.width, height:caja.height }; }
+  if (capa.tipo === 'texto') { const caja = obtenerCajaTexto(capa) ?? { width:0, height:0 }; return { x:capa.x, y:capa.y, width:caja.width, height:caja.height } }
   if (capa.tipo === 'rect') return { x:capa.x, y:capa.y, width:capa.rect?.width ?? 0, height:capa.rect?.height ?? 0 };
   if (capa.tipo === 'imagen') return { x:capa.x, y:capa.y, width:capa.imagen?.width ?? 0, height:capa.imagen?.height ?? 0 };
-  if (capa.tipo === 'circulo') { const radio = capa.circulo?.radius ?? 0; return { x:capa.x, y:capa.y, width:radio * 2, height:radio * 2 }; }
-  if (capa.tipo === 'linea') { const puntos = capa.linea?.points ?? [0,0,0,0]; return { x:capa.x + Math.min(puntos[0], puntos[2]), y:capa.y + Math.min(puntos[1], puntos[3]), width:Math.abs(puntos[2] - puntos[0]), height:Math.abs(puntos[3] - puntos[1]) }; }
+  if (capa.tipo === 'circulo') { const radio = capa.circulo?.radius ?? 0; return { x:capa.x, y:capa.y, width:radio*2, height:radio*2 } }
+  if (capa.tipo === 'linea') { const puntos = capa.linea?.points ?? [0,0,0,0]; return { x:capa.x + Math.min(puntos[0], puntos[2]), y:capa.y + Math.min(puntos[1], puntos[3]), width:Math.abs(puntos[2]-puntos[0]), height:Math.abs(puntos[3]-puntos[1]) } }
   return { x:capa.x, y:capa.y, width:0, height:0 };
 }
 
@@ -56,7 +43,7 @@ export const useTemplateStore = create((set, get) => {
       const enBatch = state._batchDepth > 0 && state._batchPushed;
       const coalescePorTiempo = Boolean(historyKey && state._lastHistoryKey === historyKey && ahora - state._lastHistoryTime < VENTANA_COALESCENCIA_MS && state.past.length > 0);
       const nextPast = enBatch || coalescePorTiempo ? state.past : [...state.past.slice(-(MAX_HISTORIAL - 1)), crearSnapshot(state)];
-      return { template:nextTemplate, fields:nextFields, selectedIds:nextSelectedIds, past:nextPast, future:[], _batchPushed:state._batchDepth > 0 ? true : false, _lastHistoryKey:historyKey, _lastHistoryTime:ahora };
+      return { template:nextTemplate, fields:nextFields, selectedIds:nextSelectedIds, past:nextPast, future:[], _batchDepth:state._batchDepth, _batchPushed:state._batchDepth > 0 ? true : false, _lastHistoryKey:historyKey, _lastHistoryTime:ahora };
     });
   }
   function cargarDatos(datos) {
@@ -64,7 +51,7 @@ export const useTemplateStore = create((set, get) => {
     set((state) => ({ template:plantilla, fields:clonar(datos.fields ?? {}), selectedIds:[], guides:[], past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, projectRevision:state.projectRevision + 1 }));
   }
   return {
-    template:crearPlantillaVacia(), fields:{}, selectedIds:[], guides:[], projectRevision:0, past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, _lastHistoryTime:0,
+    template:crearPlantillaVacia(), fields:{}, selectedIds:[], guides:[], projectRevision:0, past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryTime:0,
     sheets:{ apiKey:leerApiKeyGuardada(), spreadsheetId:'', sheetName:'', range:'A1:Z1000', headers:[], rows:[], columnToField:{}, activeRowIndex:null, status:'idle', error:'' },
     beginHistoryBatch:() => set((state) => ({ _batchDepth:state._batchDepth + 1, _batchPushed:state._batchDepth > 0 ? state._batchPushed : false, _lastHistoryKey:null })),
     endHistoryBatch:() => set({ _batchDepth:0, _batchPushed:false, _lastHistoryKey:null }),
@@ -74,7 +61,7 @@ export const useTemplateStore = create((set, get) => {
     loadTemplate:(plantillaEntrada) => set((state) => ({ template:hidratarPlantilla(clonar(plantillaEntrada)), fields:{}, selectedIds:[], guides:[], past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, projectRevision:state.projectRevision + 1 })),
     guardarEnNavegador:() => { const { template, fields } = get(); return guardarPlantillaLocal(template, fields); },
     cargarDesdeNavegador:() => { const datos = leerPlantillaLocal(); if (!datos?.template) return false; cargarDatos(datos); return true; },
-    importarPlantilla:(texto) => { try { const datos = parsearPlantilla(texto); cargarDatos(datos); return { ok:true }; } catch (error) { return { ok:false, error:error.message || 'No se pudo abrir la plantilla.' }; } },
+    importarPlantilla:(texto) => { try { const datos = parsearPlantilla(texto); cargarDatos(datos); return { ok:true }; } catch (error) { return { ok:false, error:error.message }; } },
     setName:(nombre) => aplicarCambio((state) => ({ template:{ ...state.template, nombre } }), { historyKey:'template.nombre' }),
     setCanvasBackground:(fill, opciones = {}) => aplicarCambio((state) => ({ template:{ ...state.template, canvas:{ ...state.template.canvas, background:{ fill:normalizarFill(fill, '#ffffff') } } } }), { historyKey:opciones.historyKey ?? null }),
     insertObject:(tipo, opciones) => { const capa = crearCapa(tipo, get().template, opciones); aplicarCambio((state) => ({ template:{ ...state.template, capas:[...state.template.capas, capa] }, selectedIds:[capa.id] })); return capa.id; },
@@ -97,7 +84,7 @@ export const useTemplateStore = create((set, get) => {
         if (modo === 'center-h') dx = (minX + maxX) / 2 - (caja.x + caja.width / 2);
         if (modo === 'right') dx = maxX - (caja.x + caja.width);
         if (modo === 'top') dy = minY - caja.y;
-        if (modo === 'middle') dy = (minY + maxY) / 2 - (caja.y + caja.height / 2);
+        if (modo === 'middle-h') dy = (minY + maxY) / 2 - (caja.y + caja.height / 2);
         if (modo === 'bottom') dy = maxY - (caja.y + caja.height);
         if (!dx && !dy) return;
         cambios[capa.id] = { x:Math.round(capa.x + dx), y:Math.round(capa.y + dy) };
@@ -119,19 +106,18 @@ export const useTemplateStore = create((set, get) => {
       const cambios = {};
       items.forEach((item, indice) => {
         const objetivo = inicio + indice * paso;
-        const actual = horizontal ? item.caja.x : item.caja.y;
+        const actual = horizontal ? item.capa.x : item.capa.y;
         const delta = Math.round(objetivo - actual);
         if (!delta) return;
         cambios[item.capa.id] = horizontal ? { x:Math.round(item.capa.x + delta) } : { y:Math.round(item.capa.y + delta) };
       });
-      if (!Object.keys(cambios).length) return null;
       return { template:{ ...state.template, capas:state.template.capas.map((capa) => (cambios[capa.id] ? { ...capa, ...cambios[capa.id] } : capa)) } };
     }),
     flipSelected:(eje) => aplicarCambio((state) => {
       const clave = eje === 'vertical' ? 'flipY' : 'flipX';
       let cambio = false;
       const capas = state.template.capas.map((capa) => {
-        if (!state.selectedIds.includes(capa.id) || !capa.visible || capa.bloqueada) return capa;
+        if (!state.selectedIds.includes(capa.id) || capa.visible === false || capa.bloqueada) return capa;
         cambio = true;
         return { ...capa, [clave]: !capa[clave] };
       });
@@ -157,7 +143,55 @@ export const useTemplateStore = create((set, get) => {
     renameLayer:(id, nombre) => { const limpio = String(nombre ?? '').trim(); if (!limpio) return; aplicarCambio((state) => ({ template:{ ...state.template, capas:state.template.capas.map((capa) => (capa.id === id ? { ...capa, nombre:limpio } : capa)) } })); },
     toggleLayerVisible:(id) => aplicarCambio((state) => { const objetivo = state.template.capas.find((capa) => capa.id === id); if (!objetivo) return null; const nuevaVisibilidad = !objetivo.visible; return { template:{ ...state.template, capas:state.template.capas.map((capa) => (capa.id === id ? { ...capa, visible:nuevaVisibilidad } : capa)) }, selectedIds:nuevaVisibilidad ? state.selectedIds : state.selectedIds.filter((selId) => selId !== id) }; }),
     toggleLayerLocked:(id) => aplicarCambio((state) => { const objetivo = state.template.capas.find((capa) => capa.id === id); if (!objetivo) return null; const nuevoBloqueo = !objetivo.bloqueada; return { template:{ ...state.template, capas:state.template.capas.map((capa) => (capa.id === id ? { ...capa, bloqueada:nuevoBloqueo } : capa)) }, selectedIds:nuevoBloqueo ? state.selectedIds.filter((selId) => selId !== id) : state.selectedIds }; }),
-    reorderLayer:(fromIndex, toIndex) => aplicarCambio((state) => { const total = state.template.capas.length; if (fromIndex < 0 || fromIndex >= total || toIndex < 0 || toIndex >= total || fromIndex === toIndex) return null; const capas = [...state.template.capas]; const [movida] = capas.splice(fromIndex, 1); capas.splice(toIndex, 0, movida); return { template:{ ...state.template, capas } }; }),
+    reorderLayer:(fromIndex, toIndex) => aplicarCambio((state) => { const total = state.template.capas.length; if (fromIndex < 0 || fromIndex >= total || toIndex < 0 || toIndex >= total || fromIndex === toIndex) return null; const capas = [...state.template.capas]; if ((capas[fromIndex].parentId ?? null) !== (capas[toIndex].parentId ?? null)) return null; const [movida] = capas.splice(fromIndex, 1); capas.splice(toIndex, 0, movida); return { template:{ ...state.template, capas } }; }, { historyKey:'layer:reorder' }),
+    createGroup:() => aplicarCambio((state) => {
+      const existentes = state.template.capas.map((capa) => capa.id);
+      const id = crearIdCapa(existentes);
+      const grupo = { id, tipo:'grupo', nombre:'Grupo', visible:true, bloqueada:false, x:0, y:0, rotation:0, opacity:1, parentId:null, order:state.template.capas.length, collapsed:false, blendMode:'normal', fill:1, mask:null, effects:[], linkedLayerIds:[] };
+      return { template:{ ...state.template, capas:[...state.template.capas, grupo] }, selectedIds:[id] };
+    }, { historyKey:'group:create' }),
+    groupSelected:() => aplicarCambio((state) => {
+      const seleccion = state.template.capas.filter((capa) => state.selectedIds.includes(capa.id));
+      if (!seleccion.length) return null;
+      const ids = new Set(seleccion.map((capa) => capa.id));
+      const grupoId = crearIdCapa(state.template.capas.map((capa) => capa.id));
+      const primerIndice = state.template.capas.findIndex((capa) => ids.has(capa.id));
+      const grupo = { id:grupoId, tipo:'grupo', nombre:'Grupo', visible:true, bloqueada:false, x:0, y:0, rotation:0, opacity:1, parentId:null, order:primerIndice, collapsed:false, blendMode:'normal', fill:1, mask:null, effects:[], linkedLayerIds:[] };
+      const capas = state.template.capas.map((capa) => (ids.has(capa.id) ? { ...capa, parentId:grupoId } : capa));
+      capas.splice(primerIndice, 0, grupo);
+      return { template:{ ...state.template, capas }, selectedIds:[grupoId] };
+    }, { historyKey:'group:group-selected' }),
+    ungroupSelected:() => aplicarCambio((state) => {
+      const grupos = state.template.capas.filter((capa) => capa.tipo === 'grupo' && state.selectedIds.includes(capa.id));
+      if (!grupos.length) return null;
+      const grupoIds = new Set(grupos.map((grupo) => grupo.id));
+      const capas = state.template.capas.filter((capa) => !grupoIds.has(capa.id)).map((capa) => (grupoIds.has(capa.parentId) ? { ...capa, parentId:grupos.find((grupo) => grupo.id === capa.parentId).parentId } : capa));
+      return { template:{ ...state.template, capas }, selectedIds:[] };
+    }, { historyKey:'group:ungroup' }),
+    toggleGroupCollapsed:(id) => aplicarCambio((state) => {
+      const objetivo = state.template.capas.find((capa) => capa.id === id && capa.tipo === 'grupo');
+      if (!objetivo) return null;
+      const capas = state.template.capas.map((capa) => (capa.id === id ? { ...capa, collapsed:!capa.collapsed } : capa));
+      return { template:{ ...state.template, capas } };
+    }, { historyKey:`group:${id}:collapse` }),
+    moveLayerRelative:(id, targetId, posicion) => aplicarCambio((state) => {
+      if (!puedeMoverCapa(state.template.capas, id, targetId, posicion)) return null;
+      const capas = [...state.template.capas];
+      const fromIndex = capas.findIndex((capa) => capa.id === id);
+      const dragged = capas[fromIndex];
+      const sinArrastrada = capas.filter((capa) => capa.id !== id);
+
+      if (posicion === 'inside') {
+        const indiceTarget = sinArrastrada.findIndex((capa) => capa.id === targetId);
+        sinArrastrada.splice(indiceTarget + 1, 0, { ...dragged, parentId:targetId });
+        return { template:{ ...state.template, capas:sinArrastrada } };
+      }
+
+      let insertIndex = sinArrastrada.findIndex((capa) => capa.id === targetId);
+      if (posicion === 'after') insertIndex += 1;
+      sinArrastrada.splice(insertIndex, 0, dragged);
+      return { template:{ ...state.template, capas:sinArrastrada } };
+    }, { historyKey:'layer:move' }),
     moveSelectedForward:() => aplicarCambio((state) => { if (!state.selectedIds.length) return null; const seleccion = new Set(state.selectedIds); const capas = [...state.template.capas]; let movio = false; for (let i = capas.length - 2; i >= 0; i -= 1) { if (seleccion.has(capas[i].id) && !seleccion.has(capas[i + 1].id)) { [capas[i], capas[i + 1]] = [capas[i + 1], capas[i]]; movio = true; } } return movio ? { template:{ ...state.template, capas } } : null; }),
     moveSelectedBackward:() => aplicarCambio((state) => { if (!state.selectedIds.length) return null; const seleccion = new Set(state.selectedIds); const capas = [...state.template.capas]; let movio = false; for (let i = 1; i < capas.length; i += 1) { if (seleccion.has(capas[i].id) && !seleccion.has(capas[i - 1].id)) { [capas[i - 1], capas[i]] = [capas[i], capas[i - 1]]; movio = true; } } return movio ? { template:{ ...state.template, capas } } : null; }),
     moveSelected:(dx, dy) => aplicarCambio((state) => { if (!state.selectedIds.length) return null; let movio = false; const capas = state.template.capas.map((capa) => { if (!state.selectedIds.includes(capa.id) || capa.bloqueada) return capa; movio = true; return { ...capa, x:Math.round(capa.x + dx), y:Math.round(capa.y + dy) }; }); return movio ? { template:{ ...state.template, capas } } : null; }, { historyKey:'keyboard-move' }),
