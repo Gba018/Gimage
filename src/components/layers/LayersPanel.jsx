@@ -6,7 +6,7 @@ import { getLayerById } from '../../state/layers-selectors.js';
 function MiniaturaCapa({ capa }) {
   if (capa.tipo === 'imagen') {
     const src = capa.imagen?.src;
-    if (src && !/^\[.+\]$/.test(String(src).trim())) return <img src={String(src)} alt="" />;
+    if (src && !/^(?:\[.+\]|\{\{.+\}\})$/.test(String(src).trim())) return <img src={String(src)} alt="" />;
     return <Icon name="image" size={12} />;
   }
   if (capa.tipo === 'texto') return <span className="gp-mini-texto">{(capa.texto?.texto || 'Aa').replace(/\[.*?\]/g, '').trim().slice(0, 3) || 'Aa'}</span>;
