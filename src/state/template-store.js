@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { actualizarVersionPlantilla, calcularFontSizeAutoFit, crearCapa, crearIdCapa, crearPlantillaVacia, hidratarPlantilla, normalizarCajaTexto, normalizarFill, sincronizarCambioCajaTexto } from '../template/schema.js';
+import { actualizarVersionPlantilla, calcularFontSizeAutoFit, clamp, crearCapa, crearIdCapa, crearPlantillaVacia, hidratarPlantilla, normalizarCajaTexto, normalizarFill, sincronizarCambioCajaTexto } from '../template/schema.js';
 import { extraerCamposPlantilla, normalizarNombreCampo, renombrarCampoEnCapas, reemplazarCampoEnCapas, resolverTexto } from '../template/fields.js';
 import { extraerSpreadsheetId, leerHoja } from '../sheets/sheets-client.js';
 import { normalizarRespuestaValues } from '../sheets/mapper.js';
@@ -9,21 +9,41 @@ import { esDescendiente, puedeMoverCapa } from './layers-selectors.js';
 const MAX_HISTORIAL = 100;
 const VENTANA_COALESCENCIA_MS = 350;
 const SHEETS_API_KEY_STORAGE = 'gimage_sheets_api_key';
+const GRID_STORAGE = 'gimage_grid';
+
 function clonar(valor) { return typeof globalThis.structuredClone === 'function' ? globalThis.structuredClone(valor) : JSON.parse(JSON.stringify(valor)); }
 function leerApiKeyGuardada() { if (typeof localStorage === 'undefined') return ''; return localStorage.getItem(SHEETS_API_KEY_STORAGE) ?? ''; }
 function guardarApiKey(apiKey) { if (typeof localStorage === 'undefined') return; if (apiKey) localStorage.setItem(SHEETS_API_KEY_STORAGE, apiKey); else localStorage.removeItem(SHEETS_API_KEY_STORAGE); }
 function traducirErrorSheets(error) { const mensaje = String(error?.message ?? ''); if (/API key not valid|API_KEY_INVALID|invalid API key/i.test(mensaje)) return 'La API key no es válida o no tiene habilitada la Google Sheets API.'; if (/PERMISSION_DENIED|403/i.test(mensaje)) return 'No se pudo leer la hoja: compártela como “Cualquier persona con el enlace puede ver”.'; if (/Unable to parse range|400/i.test(mensaje)) return 'No se pudo leer la hoja: revisa el nombre de la pestaña y el rango.'; return mensaje; }
+
+function leerGridGuardada() {
+  const base = { visible:false, size:50, color:'#94a3b8', opacity:0.25 };
+  if (typeof localStorage === 'undefined') return base;
+  try {
+    const raw = localStorage.getItem(GRID_STORAGE);
+    if (!raw) return base;
+    const datos = JSON.parse(raw);
+    return {
+      visible: Boolean(datos.visible),
+      size: Math.max(10, Math.round(Number(datos.size) || 50)),
+      color: typeof datos.color === 'string' && datos.color ? datos.color : '#94a3b8',
+      opacity: clamp(Number(datos.opacity) || 0.25, 0.05, 1),
+    };
+  } catch { return base; }
+}
+function guardarGrid(grid) { if (typeof localStorage === 'undefined') return; localStorage.setItem(GRID_STORAGE, JSON.stringify(grid)); }
+
 export function obtenerCajaTexto(capa) { if (!capa || capa.tipo !== 'texto') return null; return normalizarCajaTexto(capa.texto?.caja, capa.texto); }
 function normalizarCapaTextoConCaja(capa, cambioCaja = null, fields = {}) { if (!capa || capa.tipo !== 'texto' || !capa.texto) return capa; const cajaBase = obtenerCajaTexto(capa); const caja = cambioCaja ? sincronizarCambioCajaTexto(cajaBase, cambioCaja) : cajaBase; const textoParaMedir = resolverTexto(capa.texto.texto, fields); const fontSizeCalculado = caja.autoFit ? calcularFontSizeAutoFit({ ...capa.texto, texto:textoParaMedir }, caja.width, caja.height) : capa.texto.fontSize; return { ...capa, texto:{ ...capa.texto, fontSize:fontSizeCalculado, caja } }; }
 function crearSnapshot(state) { return { template:clonar(state.template), selectedIds:[...state.selectedIds], fields:clonar(state.fields) }; }
 function filtrarSeleccionValida(capas, selectedIds) { const ids = new Set(capas.map((capa) => capa.id)); return selectedIds.filter((id) => ids.has(id)); }
 export function cajaCapa(capa) {
   if (!capa) return { x:0, y:0, width:0, height:0 };
-  if (capa.tipo === 'texto') { const caja = obtenerCajaTexto(capa) ?? { width:0, height:0 }; return { x:capa.x, y:capa.y, width:caja.width, height:caja.height } }
+  if (capa.tipo === 'texto') { const caja = obtenerCajaTexto(capa) ?? { width:0, height:0 }; return { x:capa.x, y:capa.y, width:caja.width, height:caja.height }; }
   if (capa.tipo === 'rect') return { x:capa.x, y:capa.y, width:capa.rect?.width ?? 0, height:capa.rect?.height ?? 0 };
   if (capa.tipo === 'imagen') return { x:capa.x, y:capa.y, width:capa.imagen?.width ?? 0, height:capa.imagen?.height ?? 0 };
-  if (capa.tipo === 'circulo') { const radio = capa.circulo?.radius ?? 0; return { x:capa.x, y:capa.y, width:radio*2, height:radio*2 } }
-  if (capa.tipo === 'linea') { const puntos = capa.linea?.points ?? [0,0,0,0]; return { x:capa.x + Math.min(puntos[0], puntos[2]), y:capa.y + Math.min(puntos[1], puntos[3]), width:Math.abs(puntos[2]-puntos[0]), height:Math.abs(puntos[3]-puntos[1]) } }
+  if (capa.tipo === 'circulo') { const radio = capa.circulo?.radius ?? 0; return { x:capa.x, y:capa.y, width:radio*2, height:radio*2 }; }
+  if (capa.tipo === 'linea') { const puntos = capa.linea?.points ?? [0,0,0,0]; return { x:capa.x + Math.min(puntos[0], puntos[2]), y:capa.y + Math.min(puntos[1], puntos[3]), width:Math.abs(puntos[2]-puntos[0]), height:Math.abs(puntos[3]-puntos[1]) }; }
   return { x:capa.x, y:capa.y, width:0, height:0 };
 }
 
@@ -51,12 +71,15 @@ export const useTemplateStore = create((set, get) => {
     set((state) => ({ template:plantilla, fields:clonar(datos.fields ?? {}), selectedIds:[], guides:[], past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, projectRevision:state.projectRevision + 1 }));
   }
   return {
-    template:crearPlantillaVacia(), fields:{}, selectedIds:[], guides:[], projectRevision:0, past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryTime:0,
+    template:crearPlantillaVacia(), fields:{}, selectedIds:[], guides:[], projectRevision:0, past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, _lastHistoryTime:0,
     sheets:{ apiKey:leerApiKeyGuardada(), spreadsheetId:'', sheetName:'', range:'A1:Z1000', headers:[], rows:[], columnToField:{}, activeRowIndex:null, status:'idle', error:'' },
+    grid: leerGridGuardada(),
     beginHistoryBatch:() => set((state) => ({ _batchDepth:state._batchDepth + 1, _batchPushed:state._batchDepth > 0 ? state._batchPushed : false, _lastHistoryKey:null })),
     endHistoryBatch:() => set({ _batchDepth:0, _batchPushed:false, _lastHistoryKey:null }),
     undo:() => set((state) => { if (!state.past.length) return {}; const anterior = state.past[state.past.length - 1]; const tpl = clonar(anterior.template); return { template:tpl, fields:clonar(anterior.fields), selectedIds:filtrarSeleccionValida(tpl.capas, anterior.selectedIds), past:state.past.slice(0, -1), future:[...state.future, crearSnapshot(state)], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null }; }),
     redo:() => set((state) => { if (!state.future.length) return {}; const siguiente = state.future[state.future.length - 1]; const tpl = clonar(siguiente.template); return { template:tpl, fields:clonar(siguiente.fields), selectedIds:filtrarSeleccionValida(tpl.capas, siguiente.selectedIds), past:[...state.past.slice(-(MAX_HISTORIAL - 1)), crearSnapshot(state)], future:[...state.future, crearSnapshot(state)], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null }; }),
+    undoTo:(pasos=1) => { const n = Math.max(1, Math.min(Number(pasos)||1, get().past.length)); for (let i=0;i<n;i+=1) get().undo(); },
+    redoTo:(pasos=1) => { const n = Math.max(1, Math.min(Number(pasos)||1, get().future.length)); for (let i=0;i<n;i+=1) get().redo(); },
     newProject:({ name, nombre, width, height, background }) => set((state) => ({ template:crearPlantillaVacia((nombre ?? name ?? '').trim() || 'Proyecto sin título', width, height, background), fields:{}, selectedIds:[], guides:[], past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, projectRevision:state.projectRevision + 1 })),
     loadTemplate:(plantillaEntrada) => set((state) => ({ template:hidratarPlantilla(clonar(plantillaEntrada)), fields:{}, selectedIds:[], guides:[], past:[], future:[], _batchDepth:0, _batchPushed:false, _lastHistoryKey:null, projectRevision:state.projectRevision + 1 })),
     guardarEnNavegador:() => { const { template, fields } = get(); return guardarPlantillaLocal(template, fields); },
@@ -201,6 +224,8 @@ export const useTemplateStore = create((set, get) => {
     renameField:(nombreAnterior, nombreNuevo) => aplicarCambio((state) => { const anterior = normalizarNombreCampo(nombreAnterior); const siguiente = normalizarNombreCampo(nombreNuevo); if (!anterior || !siguiente || anterior === siguiente) return null; const existe = extraerCamposPlantilla(state.template).some((campo) => campo.nombre === anterior); if (!existe) return null; const capas = renombrarCampoEnCapas(state.template.capas, anterior, siguiente); const fields = { ...state.fields }; if (fields[anterior]) { fields[siguiente] = { ...fields[anterior] }; delete fields[anterior]; } return { template:{ ...state.template, capas }, fields }; }),
     removeField:(nombre) => aplicarCambio((state) => { const limpio = normalizarNombreCampo(nombre); if (!limpio) return null; const existe = extraerCamposPlantilla(state.template).some((campo) => campo.nombre === limpio); if (!existe) return null; const defecto = state.fields[limpio]?.defaultValue ?? ''; const capas = reemplazarCampoEnCapas(state.template.capas, limpio, { valorTexto:String(defecto ?? ''), valorImagen:String(defecto ?? '') }); const fields = { ...state.fields }; delete fields[limpio]; return { template:{ ...state.template, capas }, fields }; }),
     setSheetsConfig:(parcial) => set((state) => { const next = { ...state.sheets, ...parcial }; if (parcial.apiKey !== undefined) guardarApiKey(parcial.apiKey); return { sheets:next }; }),
+    setGrid:(parcial) => set((state) => { const next = { ...state.grid, ...parcial }; next.size = Math.max(10, Math.round(Number(next.size) || 50)); next.opacity = clamp(Number(next.opacity) || 0.25, 0.05, 1); guardarGrid(next); return { grid:next }; }),
+    toggleGrid:() => set((state) => { const next = { ...state.grid, visible: !state.grid.visible }; guardarGrid(next); return { grid:next }; }),
     connectSheet:async () => {
       const sheets = get().sheets;
       const spreadsheetId = extraerSpreadsheetId(sheets.spreadsheetId);

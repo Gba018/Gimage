@@ -31,11 +31,17 @@ export default function LayersPanel({ locked }) {
   const ungroupSelected = useTemplateStore((state) => state.ungroupSelected);
   const toggleGroupCollapsed = useTemplateStore((state) => state.toggleGroupCollapsed);
   const moveLayerRelative = useTemplateStore((state) => state.moveLayerRelative);
+  const historial = useTemplateStore((state) => state.past.length);
+  const undoTo = useTemplateStore((state) => state.undoTo);
 
   const [dragId, setDragId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
   const [editandoId, setEditandoId] = useState(null);
   const [nombreDraft, setNombreDraft] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroVisibilidad, setFiltroVisibilidad] = useState('todos');
+  const [filtroBloqueo, setFiltroBloqueo] = useState('todos');
   const anclaSeleccion = useRef(null);
 
   const capas = template.capas;
@@ -75,6 +81,19 @@ export default function LayersPanel({ locked }) {
     return resultado;
   }, [hijosPorPadre]);
 
+  const ordenFiltrado = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    return ordenPlano.filter((capa) => {
+      if (texto && !String(capa.nombre ?? '').toLowerCase().includes(texto)) return false;
+      if (filtroTipo !== 'todos' && capa.tipo !== filtroTipo) return false;
+      if (filtroVisibilidad === 'visibles' && !capa.visible) return false;
+      if (filtroVisibilidad === 'ocultos' && capa.visible) return false;
+      if (filtroBloqueo === 'bloqueadas' && !capa.bloqueada) return false;
+      if (filtroBloqueo === 'libres' && capa.bloqueada) return false;
+      return true;
+    });
+  }, [ordenPlano, busqueda, filtroTipo, filtroVisibilidad, filtroBloqueo]);
+
   function esVisibleEfectiva(capa) {
     let actual = capa;
     while (actual) {
@@ -104,13 +123,13 @@ export default function LayersPanel({ locked }) {
   function seleccionarRango(desde, hasta) {
     const inicio = Math.min(desde, hasta);
     const fin = Math.max(desde, hasta);
-    const ids = ordenPlano.slice(inicio, fin + 1).map((capa) => capa.id);
+    const ids = ordenFiltrado.slice(inicio, fin + 1).map((capa) => capa.id);
     setSelectedIds(ids);
   }
 
   function manejarClicCapa(event, capa) {
     if (locked) return;
-    const index = ordenPlano.findIndex((item) => item.id === capa.id);
+    const index = ordenFiltrado.findIndex((item) => item.id === capa.id);
 
     if (event.metaKey || event.ctrlKey) {
       selectLayer(capa.id, true);
@@ -128,7 +147,7 @@ export default function LayersPanel({ locked }) {
   }
 
   function moverSeleccion(delta, extender) {
-    const total = ordenPlano.length;
+    const total = ordenFiltrado.length;
     if (!total) return;
 
     const ancla = anclaSeleccion.current ?? 0;
@@ -139,7 +158,7 @@ export default function LayersPanel({ locked }) {
       return;
     }
 
-    selectLayer(ordenPlano[destino].id);
+    selectLayer(ordenFiltrado[destino].id);
     anclaSeleccion.current = destino;
   }
 
@@ -221,6 +240,38 @@ export default function LayersPanel({ locked }) {
         <button type="button" disabled={locked || !hayGrupoSeleccionado} onClick={ungroupSelected}>Desagrupar</button>
       </div>
 
+      <div className="gp-row" style={{ gap: 8, alignItems:'center' }}>
+        <select value={0} onChange={(event) => undoTo(Number(event.target.value))} aria-label="Volver a un punto del historial" style={{ maxWidth: 180 }}>
+          <option value={0}>Historial: ahora</option>
+          {Array.from({ length: historial }, (_, i) => (
+            <option key={i} value={i + 1}>{`${i + 1} cambio${i ? 's' : ''} atrás`}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="gp-row" style={{ gap: 8, flexWrap:'wrap' }}>
+        <input type="search" placeholder="Buscar capa" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} aria-label="Buscar capa" style={{ flex:'1 1 140px' }} />
+        <select value={filtroTipo} onChange={(event) => setFiltroTipo(event.target.value)} aria-label="Filtrar por tipo">
+          <option value="todos">Tipo: todos</option>
+          <option value="texto">Texto</option>
+          <option value="imagen">Imagen</option>
+          <option value="rect">Rectángulo</option>
+          <option value="circulo">Círculo</option>
+          <option value="linea">Línea</option>
+          <option value="grupo">Grupo</option>
+        </select>
+        <select value={filtroVisibilidad} onChange={(event) => setFiltroVisibilidad(event.target.value)} aria-label="Filtrar por visibilidad">
+          <option value="todos">Visibilidad: todas</option>
+          <option value="visibles">Visibles</option>
+          <option value="ocultos">Ocultas</option>
+        </select>
+        <select value={filtroBloqueo} onChange={(event) => setFiltroBloqueo(event.target.value)} aria-label="Filtrar por bloqueo">
+          <option value="todos">Bloqueo: todos</option>
+          <option value="bloqueadas">Bloqueadas</option>
+          <option value="libres">Libres</option>
+        </select>
+      </div>
+
       <div
         className="gp-layers"
         role="list"
@@ -228,7 +279,7 @@ export default function LayersPanel({ locked }) {
         tabIndex={0}
         onKeyDown={manejarTeclado}
       >
-        {ordenPlano.map((capa) => {
+        {ordenFiltrado.map((capa) => {
           const profundidad = profundidades.get(capa.id) ?? 0;
           const esGrupo = capa.tipo === 'grupo';
           const hijos = hijosPorPadre.get(capa.id) ?? [];
