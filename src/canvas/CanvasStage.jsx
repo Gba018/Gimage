@@ -53,6 +53,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const revision = useTemplateStore((state) => state.projectRevision);
   const fields = useTemplateStore((state) => state.fields);
   const sheets = useTemplateStore((state) => state.sheets);
+  const grid = useTemplateStore((state) => state.grid);
   const clearSelection = useTemplateStore((state) => state.clearSelection);
   const setSelectedIds = useTemplateStore((state) => state.setSelectedIds);
   const alignSelected = useTemplateStore((state) => state.alignSelected);
@@ -63,6 +64,12 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const updateObject = useTemplateStore((state) => state.updateObject);
   const updateObjects = useTemplateStore((state) => state.updateObjects);
   const addGuide = useTemplateStore((state) => state.addGuide);
+  const setGrid = useTemplateStore((state) => state.setGrid);
+  const toggleGrid = useTemplateStore((state) => state.toggleGrid);
+  const duplicateSelected = useTemplateStore((state) => state.duplicateSelected);
+  const deleteSelected = useTemplateStore((state) => state.deleteSelected);
+  const moveSelectedForward = useTemplateStore((state) => state.moveSelectedForward);
+  const moveSelectedBackward = useTemplateStore((state) => state.moveSelectedBackward);
 
   const holderRef = useRef(null);
   const stageRef = useRef(null);
@@ -311,8 +318,8 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
     const state = useTemplateStore.getState();
     const seleccion = limitesNodos(drag.ids.map((selectedId) => nodeRefs.current[selectedId]), objectGroupRef.current);
     if (!seleccion) return;
-    const destinoX = [state.template.canvas.width / 2];
-    const destinoY = [state.template.canvas.height / 2];
+    const destinoX = [state.template.canvas.width / 2, 0, state.template.canvas.width];
+    const destinoY = [state.template.canvas.height / 2, 0, state.template.canvas.height];
     state.template.capas.filter((capa) => esVisibleEfectivaEn(state.template.capas, capa) && !drag.ids.includes(capa.id)).forEach((capa) => {
       const caja = limitesNodos([nodeRefs.current[capa.id]], objectGroupRef.current);
       if (caja) {
@@ -491,6 +498,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
   const editingLayer = editingTextId ? capas.find((capa) => capa.id === editingTextId && capa.tipo === 'texto' && esVisibleEfectivaEn(capas, capa) && !capa.bloqueada) : null;
   const editingBox = editingLayer ? obtenerCajaTexto(editingLayer) : null;
   const capaUnica = selectedIds.length === 1 ? capas.find((capa) => capa.id === selectedIds[0]) : null;
+  const haySeleccion = selectedIds.length > 0;
 
   return (
     <main className="workspace" aria-label="Editor de lienzo">
@@ -562,6 +570,14 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
               <Layer listening={false}>
                 <Rect x={0} y={0} width={canvas.width} height={canvas.height} {...bgFillProps} shadowColor="#183024" shadowBlur={35} shadowOpacity={0.13} shadowOffsetY={10} />
               </Layer>
+              <Layer listening={false} visible={Boolean(grid.visible)}>
+                {Array.from({ length: Math.ceil(canvas.width / grid.size) + 1 }, (_, i) => (
+                  <Rect key={`grid-v-${i}`} x={i * grid.size} y={0} width={1} height={canvas.height} fill={grid.color} opacity={grid.opacity} />
+                ))}
+                {Array.from({ length: Math.ceil(canvas.height / grid.size) + 1 }, (_, i) => (
+                  <Rect key={`grid-h-${i}`} x={0} y={i * grid.size} width={canvas.width} height={1} fill={grid.color} opacity={grid.opacity} />
+                ))}
+              </Layer>
               <Layer listening={false} visible={!exportando}>
                 <ManualGuides canvas={canvas} zoom={view.scale} draftGuide={draftGuide} />
               </Layer>
@@ -596,6 +612,13 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
               </Layer>
             </Stage>
           )}
+          <div className="grid-controls" style={{ position:'absolute', top:8, right:8, display:'flex', gap:6, alignItems:'center', background:'rgba(15,23,42,0.65)', padding:'4px 8px', borderRadius:8, zIndex:5 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:4, color:'#e2e8f0', fontSize:12 }}>
+              <input type="checkbox" checked={grid.visible} onChange={toggleGrid} />
+              Cuadrícula
+            </label>
+            <input type="number" min={10} max={500} value={grid.size} onChange={(event) => setGrid({ size: Number(event.target.value) })} aria-label="Tamaño de cuadrícula" style={{ width:56 }} />
+          </div>
           {editingLayer && editingBox && (
             <InlineTextEditor
               capa={editingLayer}
@@ -612,20 +635,28 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
           )}
         </div>
         <div className="context-rail" aria-label="Acciones de selección">
-          {capaUnica && (
+          {haySeleccion && (
             <>
-              <button type="button" title="Alinear a la izquierda" aria-label="Alinear a la izquierda" onClick={() => alignSelected('left')} disabled={capaUnica.bloqueada}><Icon name="alignLeft" size={16} /></button>
-              <button type="button" title="Centrar horizontalmente" aria-label="Centrar horizontalmente" onClick={() => alignSelected('center-h')} disabled={capaUnica.bloqueada}><Icon name="alignCenterH" size={16} /></button>
-              <button type="button" title="Alinear a la derecha" aria-label="Alinear a la derecha" onClick={() => alignSelected('right')} disabled={capaUnica.bloqueada}><Icon name="alignRight" size={16} /></button>
-              <button type="button" title="Alinear arriba" aria-label="Alinear arriba" onClick={() => alignSelected('top')} disabled={capaUnica.bloqueada}><Icon name="alignTop" size={16} /></button>
-              <button type="button" title="Centrar verticalmente" aria-label="Centrar verticalmente" onClick={() => alignSelected('middle-h')} disabled={capaUnica.bloqueada}><Icon name="alignCenterV" size={16} /></button>
-              <button type="button" title="Alinear abajo" aria-label="Alinear abajo" onClick={() => alignSelected('bottom')} disabled={capaUnica.bloqueada}><Icon name="alignBottom" size={16} /></button>
-              <button type="button" title="Distribuir horizontalmente" aria-label="Distribuir horizontalmente" onClick={() => distributeSelected('horizontal')} disabled={capaUnica.bloqueada}><Icon name="distributeH" size={16} /></button>
-              <button type="button" title="Distribuir verticalmente" aria-label="Distribuir verticalmente" onClick={() => distributeSelected('vertical')} disabled={capaUnica.bloqueada}><Icon name="distributeV" size={16} /></button>
-              <button type="button" title="Espejar horizontal" aria-label="Espejar horizontal" onClick={() => flipSelected('horizontal')} disabled={capaUnica.bloqueada}><Icon name="flipH" size={16} /></button>
-              <button type="button" title="Espejar vertical" aria-label="Espejar vertical" onClick={() => flipSelected('vertical')} disabled={capaUnica.bloqueada}><Icon name="flipV" size={16} /></button>
-              <button type="button" title={capaUnica.visible ? 'Ocultar' : 'Mostrar'} aria-label={capaUnica.visible ? 'Ocultar capa' : 'Mostrar capa'} onClick={() => toggleLayerVisible(capaUnica.id)}><Icon name={capaUnica.visible ? 'eye' : 'eyeOff'} size={16} /></button>
-              <button type="button" title={capaUnica.bloqueada ? 'Desbloquear' : 'Bloquear'} aria-label={capaUnica.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'} onClick={() => toggleLayerLocked(capaUnica.id)}><Icon name={capaUnica.bloqueada ? 'lock' : 'unlock'} size={16} /></button>
+              <button type="button" title="Duplicar" onClick={duplicateSelected}>Duplicar</button>
+              <button type="button" title="Eliminar" onClick={deleteSelected}>Eliminar</button>
+              <button type="button" title="Traer al frente" onClick={moveSelectedForward}>Subir</button>
+              <button type="button" title="Enviar atrás" onClick={moveSelectedBackward}>Bajar</button>
+              {capaUnica && (
+                <>
+                  <button type="button" title="Alinear a la izquierda" aria-label="Alinear a la izquierda" onClick={() => alignSelected('left')} disabled={capaUnica.bloqueada}><Icon name="alignLeft" size={16} /></button>
+                  <button type="button" title="Centrar horizontalmente" aria-label="Centrar horizontalmente" onClick={() => alignSelected('center-h')} disabled={capaUnica.bloqueada}><Icon name="alignCenterH" size={16} /></button>
+                  <button type="button" title="Alinear a la derecha" aria-label="Alinear a la derecha" onClick={() => alignSelected('right')} disabled={capaUnica.bloqueada}><Icon name="alignRight" size={16} /></button>
+                  <button type="button" title="Alinear arriba" aria-label="Alinear arriba" onClick={() => alignSelected('top')} disabled={capaUnica.bloqueada}><Icon name="alignTop" size={16} /></button>
+                  <button type="button" title="Centrar verticalmente" aria-label="Centrar verticalmente" onClick={() => alignSelected('middle-h')} disabled={capaUnica.bloqueada}><Icon name="alignCenterV" size={16} /></button>
+                  <button type="button" title="Alinear abajo" aria-label="Alinear abajo" onClick={() => alignSelected('bottom')} disabled={capaUnica.bloqueada}><Icon name="alignBottom" size={16} /></button>
+                  <button type="button" title="Distribuir horizontalmente" aria-label="Distribuir horizontalmente" onClick={() => distributeSelected('horizontal')} disabled={capaUnica.bloqueada}><Icon name="distributeH" size={16} /></button>
+                  <button type="button" title="Distribuir verticalmente" aria-label="Distribuir verticalmente" onClick={() => distributeSelected('vertical')} disabled={capaUnica.bloqueada}><Icon name="distributeV" size={16} /></button>
+                  <button type="button" title="Espejar horizontal" aria-label="Espejar horizontal" onClick={() => flipSelected('horizontal')} disabled={capaUnica.bloqueada}><Icon name="flipH" size={16} /></button>
+                  <button type="button" title="Espejar vertical" aria-label="Espejar vertical" onClick={() => flipSelected('vertical')} disabled={capaUnica.bloqueada}><Icon name="flipV" size={16} /></button>
+                  <button type="button" title={capaUnica.visible ? 'Ocultar' : 'Mostrar'} aria-label={capaUnica.visible ? 'Ocultar capa' : 'Mostrar capa'} onClick={() => toggleLayerVisible(capaUnica.id)}><Icon name={capaUnica.visible ? 'eye' : 'eyeOff'} size={16} /></button>
+                  <button type="button" title={capaUnica.bloqueada ? 'Desbloquear' : 'Bloquear'} aria-label={capaUnica.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'} onClick={() => toggleLayerLocked(capaUnica.id)}><Icon name={capaUnica.bloqueada ? 'lock' : 'unlock'} size={16} /></button>
+                </>
+              )}
             </>
           )}
         </div>
