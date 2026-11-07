@@ -4,6 +4,7 @@ import { useTemplateStore } from '../state/template-store.js';
 import { extraerCamposPlantilla, normalizarNombreCampo } from '../template/fields.js';
 import { valoresDeFila } from '../sheets/mapper.js';
 import GoogleSheetsConnector from './GoogleSheetsConnector.jsx';
+import LayersPanel from '../components/layers/LayersPanel.jsx';
 
 const normalizar = valor => String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 export function analizarFilas(texto, total) {
@@ -19,18 +20,6 @@ export function analizarFilas(texto, total) {
   }
   return { filas: [...filas].sort((a, b) => a - b), error: '' };
 }
-function MiniaturaCapa({ capa }) {
-  if (capa.tipo === 'imagen') {
-    const src = capa.imagen?.src;
-    if (src && !/^\[.+\]$/.test(String(src).trim())) return <img src={String(src)} alt="" />;
-    return <Icon name="image" size={12} />;
-  }
-  if (capa.tipo === 'texto') return <span className="gp-mini-texto">{(capa.texto?.texto || 'Aa').replace(/\[.*?\]/g, '').trim().slice(0, 3) || 'Aa'}</span>;
-  if (capa.tipo === 'rect') return <span className="gp-mini-forma" style={{ background: capa.rect?.fill || '#94a3b8' }} />;
-  if (capa.tipo === 'circulo') return <span className="gp-mini-forma gp-redonda" style={{ background: capa.circulo?.fill || '#94a3b8' }} />;
-  if (capa.tipo === 'linea') return <span className="gp-mini-linea" style={{ background: capa.linea?.stroke?.color || '#94a3b8' }} />;
-  return <Icon name="square" size={12} />;
-}
 const estilos = `
 .gp-left{width:320px;min-width:320px;height:100%;display:flex;flex-direction:column;background:#0f172a;color:#e2e8f0;border-right:1px solid #1e293b;font-family:Inter,system-ui,sans-serif}
 .gp-tabs{display:flex;border-bottom:1px solid #334155}.gp-tabs button{flex:1;padding:14px 4px;border:0;background:transparent;color:#94a3b8;cursor:pointer;font-size:12px;font-weight:600}.gp-tabs button[aria-selected=true]{background:#1e293b;color:#7dd3fc}
@@ -42,8 +31,6 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
   const [buscar, setBuscar] = useState('');
   const [modo, setModo] = useState('todas');
   const [texto, setTexto] = useState('');
-  const [arrastrando, setArrastrando] = useState(null);
-  const [dropEn, setDropEn] = useState(null);
   const template = useTemplateStore(s => s.template);
   const fields = useTemplateStore(s => s.fields);
   const sheets = useTemplateStore(s => s.sheets);
@@ -107,17 +94,9 @@ export default function LeftPanel({ onInsertText, onInsertRect, onInsertCircle, 
         {loteEstado.estado === 'listo' && <p className="gp-ok">Listo: {loteEstado.exitosos} de {loteEstado.total} imágenes.</p>}
         {loteEstado.error && <p role="alert" className="gp-error">{loteEstado.error}</p>}
         {(loteEstado.detalles || []).map(d => <p key={d.fila} className="gp-error">Fila {d.fila}: {d.motivo}</p>)}
-        {loteEstado.fallidos.length > 0 && !locked && <button type="button" onClick={() => onReintentarLote(loteEstado.fallidos.map(n => n - 1))}><Icon name="refresh" size={15} /><span>Reintentar {loteEstado.fallidos.length} filas</span></button>}
+        {(loteEstado.fallidos || []).length > 0 && !locked && <button type="button" onClick={() => onReintentarLote(loteEstado.fallidos.map(n => n - 1))}><Icon name="refresh" size={15} /><span>Reintentar {loteEstado.fallidos.length} filas</span></button>}
       </section>}
-      {tab === 'capas' && <section><h2>Capas</h2><p className="gp-hint">Orden de apilado · arriba = delante. Arrastra para reordenar.</p><div className="gp-layers" role="list" aria-label="Pila de capas">
-        {arrastrando != null && dropEn != null && <div className="gp-drop-line" style={{ top: dropEn * 32 - 1 }} aria-hidden="true" />}
-        {template.capas.map((c, i) => { const origen = template.capas.length - 1 - i; return <div key={c.id} role="listitem" aria-label={`Capa: ${c.nombre}`} className={`gp-layer ${selectedIds.includes(c.id) ? 'gp-selected' : ''} ${c.visible ? '' : 'gp-hidden'} ${arrastrando === origen ? 'gp-dragging' : ''}`} draggable={!locked} onDragStart={e => { setArrastrando(origen); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(origen)); }} onDragEnd={() => { setArrastrando(null); setDropEn(null); }} onDragOver={e => { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setDropEn(e.clientY < r.top + r.height / 2 ? i : i + 1); }} onDrop={e => { e.preventDefault(); const desde = arrastra !== null ? arrastra : Number(e.dataTransfer.getData('text/plain')); const destino = Math.max(0, Math.min(template.capas.length - 1, template.capas.length - 1 - dropEn)); if (!locked && !Number.isNaN(desde) && desde !== destino) store().reorderLayer(desde, destino); setArrastrando(null); setDropEn(null); }}>
-          <span className="gp-mini" aria-hidden="true"><MiniaturaCapa capa={c} /></span>
-          <button type="button" className="gp-layer-name" disabled={locked} onClick={() => store().selectLayer(c.id)} onDoubleClick={() => { const n = window.prompt('Nombre de la capa', c.nombre); if (n) store().renameLayer(c.id, n); }}>{c.nombre}</button>
-          <button type="button" className="gp-icon-btn" disabled={locked} aria-label={c.visible ? 'Ocultar capa' : 'Mostrar capa'} title={c.visible ? 'Ocultar capa' : 'Mostrar capa'} onClick={() => store().toggleLayerVisible(c.id)}><Icon name={c.visible ? 'eye' : 'eyeOff'} size={14} /></button>
-          <button type="button" className="gp-icon-btn" disabled={locked} aria-label={c.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'} title={c.bloqueada ? 'Desbloquear capa' : 'Bloquear capa'} onClick={() => store().toggleLayerLocked(c.id)}><Icon name={c.bloqueada ? 'lock' : 'unlock'} size={14} /></button>
-        </div>; })}
-      </div></section>}
+      {tab === 'capas' && <LayersPanel locked={locked} />}
     </div>
   </aside>;
 }
