@@ -637,10 +637,10 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         <div className="context-rail" aria-label="Acciones de selección">
           {haySeleccion && (
             <>
-              <button type="button" title="Duplicar" onClick={duplicateSelected}>Duplicar</button>
-              <button type="button" title="Eliminar" onClick={deleteSelected}>Eliminar</button>
-              <button type="button" title="Traer al frente" onClick={moveSelectedForward}>Subir</button>
-              <button type="button" title="Enviar atrás" onClick={moveSelectedBackward}>Bajar</button>
+              <button type="button" title="Duplicar" aria-label="Duplicar" onClick={duplicateSelected}><Icon name="copy" size={16} /></button>
+              <button type="button" title="Eliminar" aria-label="Eliminar" onClick={deleteSelected}><Icon name="trash" size={16} /></button>
+              <button type="button" title="Traer al frente" aria-label="Traer al frente" onClick={moveSelectedForward}><Icon name="arrowUp" size={16} /></button>
+              <button type="button" title="Enviar atrás" aria-label="Enviar atrás" onClick={moveSelectedBackward}><Icon name="arrowDown" size={16} /></button>
               {capaUnica && (
                 <>
                   <button type="button" title="Alinear a la izquierda" aria-label="Alinear a la izquierda" onClick={() => alignSelected('left')} disabled={capaUnica.bloqueada}><Icon name="alignLeft" size={16} /></button>
