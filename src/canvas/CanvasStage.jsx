@@ -517,7 +517,7 @@ const CanvasStage = forwardRef(function CanvasStage({ spacePressed, onZoomChange
         <div className="ruler-corner" aria-hidden="true"><span /></div>
         <Ruler orientation="horizontal" size={size.width} offset={view.x} zoom={view.scale} onStartGuide={beginGuide} />
         <Ruler orientation="vertical" size={size.height} offset={view.y} zoom={view.scale} onStartGuide={beginGuide} />
-        <div className={`stage-holder ${spacePressed ? 'pan-ready' : ''} ${panning ? 'is-panning' : ''}`} ref={holderRef} onMouseDownCapture={beginPan} data-testid="stage-holder" aria-label="Lienzo de diseño">
+        <div className={`stage-holder ${spacePressed ? 'pan-ready' : ''} ${panning ? 'is-panning' : ''}`} ref={holderRef} onMouseDownCapture={beginPan} data-testid="stage-holder" aria-label="Lienzo de diseño" style={{ position: 'relative' }}>
           {size.width > 0 && size.height > 0 && (
             <Stage
               ref={stageRef}
