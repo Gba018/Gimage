@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons.jsx';
 import { useTemplateStore } from '../../state/template-store.js';
+import { getLayerById } from '../../state/layers-selectors.js';
 
 function MiniaturaCapa({ capa }) {
   if (capa.tipo === 'imagen') {
@@ -12,6 +13,7 @@ function MiniaturaCapa({ capa }) {
   if (capa.tipo === 'rect') return <span className="gp-mini-forma" style={{ background: capa.rect?.fill || '#94a3b8' }} />;
   if (capa.tipo === 'circulo') return <span className="gp-mini-forma gp-redonda" style={{ background: capa.circulo?.fill || '#94a3b8' }} />;
   if (capa.tipo === 'linea') return <span className="gp-mini-linea" style={{ background: capa.linea?.stroke?.color || '#94a3b8' }} />;
+  if (capa.tipo === 'grupo') return <span className="gp-mini-forma" style={{ background: '#64748b' }} />;
   return <Icon name="square" size={12} />;
 }
 
@@ -24,15 +26,65 @@ export default function LayersPanel({ locked }) {
   const renameLayer = useTemplateStore((state) => state.renameLayer);
   const toggleLayerVisible = useTemplateStore((state) => state.toggleLayerVisible);
   const toggleLayerLocked = useTemplateStore((state) => state.toggleLayerLocked);
-  const reorderLayer = useTemplateStore((state) => state.reorderLayer);
+  const createGroup = useTemplateStore((state) => state.createGroup);
+  const groupSelected = useTemplateStore((state) => state.groupSelected);
+  const ungroupSelected = useTemplateStore((state) => state.ungroupSelected);
+  const toggleGroupCollapsed = useTemplateStore((state) => state.toggleGroupCollapsed);
+  const moveLayerRelative = useTemplateStore((state) => state.moveLayerRelative);
 
-  const [dragIndex, setDragIndex] = useState(null);
-  const [dropIndex, setDropIndex] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [editandoId, setEditandoId] = useState(null);
   const [nombreDraft, setNombreDraft] = useState('');
   const anclaSeleccion = useRef(null);
 
   const capas = template.capas;
+
+  const hijosPorPadre = useMemo(() => {
+    const mapa = new Map();
+    capas.forEach((capa) => {
+      const padre = capa.parentId ?? null;
+      const lista = mapa.get(padre) ?? [];
+      lista.push(capa);
+      mapa.set(padre, lista);
+    });
+    return mapa;
+  }, [capas]);
+
+  const profundidades = useMemo(() => {
+    const mapa = new Map();
+    function recorrer(padreId, nivel) {
+      (hijosPorPadre.get(padreId) ?? []).forEach((capa) => {
+        mapa.set(capa.id, nivel);
+        if (capa.tipo === 'grupo') recorrer(capa.id, nivel + 1);
+      });
+    }
+    recorrer(null, 0);
+    return mapa;
+  }, [hijosPorPadre]);
+
+  const ordenPlano = useMemo(() => {
+    const resultado = [];
+    function recorrer(padreId) {
+      (hijosPorPadre.get(padreId) ?? []).forEach((capa) => {
+        resultado.push(capa);
+        if (capa.tipo === 'grupo' && !capa.collapsed) recorrer(capa.id);
+      });
+    }
+    recorrer(null);
+    return resultado;
+  }, [hijosPorPadre]);
+
+  function esVisibleEfectiva(capa) {
+    let actual = capa;
+    while (actual) {
+      if (!actual.visible) return false;
+      if (!actual.parentId) break;
+      actual = getLayerById(capas, actual.parentId);
+      if (!actual) break;
+    }
+    return true;
+  }
 
   function iniciarRenombre(capa) {
     setEditandoId(capa.id);
@@ -52,12 +104,13 @@ export default function LayersPanel({ locked }) {
   function seleccionarRango(desde, hasta) {
     const inicio = Math.min(desde, hasta);
     const fin = Math.max(desde, hasta);
-    const ids = capas.slice(inicio, fin + 1).map((capa) => capa.id);
+    const ids = ordenPlano.slice(inicio, fin + 1).map((capa) => capa.id);
     setSelectedIds(ids);
   }
 
-  function manejarClicCapa(event, capa, index) {
+  function manejarClicCapa(event, capa) {
     if (locked) return;
+    const index = ordenPlano.findIndex((item) => item.id === capa.id);
 
     if (event.metaKey || event.ctrlKey) {
       selectLayer(capa.id, true);
@@ -75,7 +128,7 @@ export default function LayersPanel({ locked }) {
   }
 
   function moverSeleccion(delta, extender) {
-    const total = capas.length;
+    const total = ordenPlano.length;
     if (!total) return;
 
     const ancla = anclaSeleccion.current ?? 0;
@@ -86,7 +139,7 @@ export default function LayersPanel({ locked }) {
       return;
     }
 
-    selectLayer(capas[destino].id);
+    selectLayer(ordenPlano[destino].id);
     anclaSeleccion.current = destino;
   }
 
@@ -118,10 +171,56 @@ export default function LayersPanel({ locked }) {
     }
   }
 
+  function manejarDragOver(event, capa) {
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const y = event.clientY - rect.top;
+    const altura = rect.height;
+    let posicion;
+
+    if (capa.tipo === 'grupo' && y > altura * 0.33 && y < altura * 0.67) {
+      posicion = 'inside';
+    } else if (y < altura * 0.5) {
+      posicion = 'before';
+    } else {
+      posicion = 'after';
+    }
+
+    setDropTarget({ id: capa.id, posicion });
+  }
+
+  function limpiarDrag() {
+    setDragId(null);
+    setDropTarget(null);
+  }
+
+  function manejarDrop(event, capa) {
+    event.preventDefault();
+    const origenId = dragId;
+    if (!origenId || origenId === capa.id) {
+      limpiarDrag();
+      return;
+    }
+    const posicion = dropTarget?.posicion ?? 'before';
+    moveLayerRelative(origenId, capa.id, posicion);
+    limpiarDrag();
+  }
+
+  const hayGrupoSeleccionado = capas.some(
+    (capa) => capa.tipo === 'grupo' && selectedIds.includes(capa.id),
+  );
+
   return (
     <section>
       <h2>Capas</h2>
-      <p className="gp-hint">Orden de apilado · arriba = delante. Arrastra para reordenar.</p>
+      <p className="gp-hint">Orden de apilado · arriba = delante. Arrastra para reordenar o anidar.</p>
+
+      <div className="gp-row" style={{ gap: 8 }}>
+        <button type="button" disabled={locked} onClick={createGroup}>+ Grupo</button>
+        <button type="button" disabled={locked || !selectedIds.length} onClick={groupSelected}>Agrupar</button>
+        <button type="button" disabled={locked || !hayGrupoSeleccionado} onClick={ungroupSelected}>Desagrupar</button>
+      </div>
+
       <div
         className="gp-layers"
         role="list"
@@ -129,47 +228,65 @@ export default function LayersPanel({ locked }) {
         tabIndex={0}
         onKeyDown={manejarTeclado}
       >
-        {dropIndex != null && (
-          <div className="gp-drop-line" style={{ top: dropIndex * 32 - 1 }} aria-hidden="true" />
-        )}
-        {capas.map((capa, index) => {
+        {ordenPlano.map((capa) => {
+          const profundidad = profundidades.get(capa.id) ?? 0;
+          const esGrupo = capa.tipo === 'grupo';
+          const hijos = hijosPorPadre.get(capa.id) ?? [];
           const seleccionada = selectedIds.includes(capa.id);
           const editando = editandoId === capa.id;
+          const visibleEfectiva = esVisibleEfectiva(capa);
+          const drop = dropTarget?.id === capa.id ? dropTarget.posicion : null;
+
+          const estiloDrop =
+            drop === 'before'
+              ? { boxShadow: 'inset 0 2px 0 #1473e6' }
+              : drop === 'after'
+                ? { boxShadow: 'inset 0 -2px 0 #1473e6' }
+                : drop === 'inside'
+                  ? { background: '#1e3a5f' }
+                  : {};
+
           return (
             <div
               key={capa.id}
               role="listitem"
+              aria-level={profundidad + 1}
+              aria-expanded={esGrupo ? !capa.collapsed : undefined}
               aria-selected={seleccionada}
               aria-label={`Capa: ${capa.nombre}`}
-              className={`gp-layer ${seleccionada ? 'gp-selected' : ''} ${capa.visible ? '' : 'gp-hidden'} ${dragIndex === index ? 'gp-dragging' : ''}`}
+              className={`gp-layer ${seleccionada ? 'gp-selected' : ''} ${visibleEfectiva ? '' : 'gp-hidden'} ${dragId === capa.id ? 'gp-dragging' : ''}`}
+              style={{ paddingLeft: 6 + profundidad * 18, ...estiloDrop }}
               draggable={!locked && !editando}
-              onClick={(event) => manejarClicCapa(event, capa, index)}
+              onClick={(event) => manejarClicCapa(event, capa)}
               onDragStart={(event) => {
-                setDragIndex(index);
+                setDragId(capa.id);
                 event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', String(index));
+                event.dataTransfer.setData('text/plain', capa.id);
               }}
-              onDragEnd={() => {
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDropIndex(index);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const origen = dragIndex ?? Number(event.dataTransfer.getData('text/plain'));
-                if (Number.isInteger(origen) && origen !== index) {
-                  reorderLayer(origen, index);
-                }
-                setDragIndex(null);
-                setDropIndex(null);
-              }}
+              onDragEnd={limpiarDrag}
+              onDragOver={(event) => manejarDragOver(event, capa)}
+              onDrop={(event) => manejarDrop(event, capa)}
             >
+              {esGrupo ? (
+                <button
+                  type="button"
+                  className="gp-icon-btn"
+                  aria-label={capa.collapsed ? 'Expandir grupo' : 'Colapsar grupo'}
+                  aria-expanded={!capa.collapsed}
+                  onClick={() => toggleGroupCollapsed(capa.id)}
+                >
+                  <span aria-hidden="true">{capa.collapsed ? '▸' : '▾'}</span>
+                </button>
+              ) : (
+                <span className="gp-icon-btn" aria-hidden="true" style={{ opacity: 0 }}>{'•'}</span>
+              )}
+
               <span className="gp-mini" aria-hidden="true">
                 <MiniaturaCapa capa={capa} />
               </span>
+
+              {esGrupo && <span aria-hidden="true">{capa.collapsed ? '📂' : '📁'}</span>}
+
               {editando ? (
                 <input
                   type="text"
@@ -189,12 +306,15 @@ export default function LayersPanel({ locked }) {
                   type="button"
                   className="gp-layer-name"
                   disabled={locked}
-                  onClick={(event) => manejarClicCapa(event, capa, index)}
+                  onClick={(event) => manejarClicCapa(event, capa)}
                   onDoubleClick={() => iniciarRenombre(capa)}
                 >
                   {capa.nombre}
                 </button>
               )}
+
+              {esGrupo && <span style={{ fontSize: 10, color: '#94a3b8' }}>{hijos.length}</span>}
+
               <button
                 type="button"
                 className="gp-icon-btn"
