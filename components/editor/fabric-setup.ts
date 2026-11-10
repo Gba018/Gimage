@@ -13,6 +13,7 @@ declare module "fabric" {
     gimageTextOverflow?: "fit" | "clip" | "allow";
     gimageTextMaxHeight?: number;
     gimageTextMinFontSize?: number;
+    gimageTextProtected?: boolean;
   }
 }
 
@@ -35,7 +36,7 @@ export function configureFabric(): void {
   });
 }
 
-export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField", "gimageTextOverflow", "gimageTextMaxHeight", "gimageTextMinFontSize"];
+export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField", "gimageTextOverflow", "gimageTextMaxHeight", "gimageTextMinFontSize", "gimageTextProtected"];
 const IMAGE_FIELD_SRC = /^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/;
 
 function normalizeDynamicImages(object: SerializedObject): SerializedObject {
@@ -99,6 +100,22 @@ function fitTextObject(text: IText, source: SerializedObject): void {
     text.initDimensions();
   }
   text.setCoords();
+}
+
+function assertNoTextCollisions(objects: FabricObject[]): void {
+  const texts = objects.filter((object): object is IText => object instanceof IText);
+  const protectedObjects = objects.filter((object) => !(object instanceof IText) && object.gimageTextProtected);
+  for (const text of texts) {
+    const textBox = text.getBoundingRect();
+    for (const protectedObject of protectedObjects) {
+      const objectBox = protectedObject.getBoundingRect();
+      const overlaps = textBox.left < objectBox.left + objectBox.width
+        && textBox.left + textBox.width > objectBox.left
+        && textBox.top < objectBox.top + objectBox.height
+        && textBox.top + textBox.height > objectBox.top;
+      if (overlaps) throw new Error(`Text "${text.name || "Text"}" overlaps protected object "${protectedObject.name || protectedObject.type}".`);
+    }
+  }
 }
 
 export function uid(): string {
@@ -204,6 +221,7 @@ export async function renderPage(
   const sc = new StaticCanvas(el, { width, height, enableRetinaScaling: false, renderOnAddRemove: false });
   try {
     const objects = await enlivenSafe(page.objects, options.strict, true);
+    if (options.strict) assertNoTextCollisions(objects);
     sc.add(...objects);
     if (!options.transparent) sc.backgroundColor = backgroundFill(page.background, width, height);
     else if (options.format === "jpeg") sc.backgroundColor = "#ffffff";

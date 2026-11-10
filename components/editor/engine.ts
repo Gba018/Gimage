@@ -31,6 +31,7 @@ export type SelectionInfo = {
   isImage: boolean;
   isLine: boolean;
   imageField: string;
+  textProtected: boolean;
   fill: string | null;
   stroke: string | null;
   strokeWidth: number;
@@ -211,6 +212,7 @@ export class EditorEngine {
       isText,
       isImage: !isMulti && active instanceof FabricImage,
       imageField: !isMulti && active instanceof FabricImage ? active.gimageImageField ?? "" : "",
+      textProtected: !isMulti && !isText ? !!active.gimageTextProtected : false,
       isLine: !isMulti && typeOf(active) === "line",
       fill: solidColor(leaf?.fill),
       stroke: solidColor(leaf?.stroke),
@@ -988,6 +990,13 @@ export class EditorEngine {
       }));
     }
     this.canvas.requestRenderAll();
+    this.commit();
+  }
+
+  setTextProtected(protectedObject: boolean): void {
+    const active = this.canvas.getActiveObject();
+    if (!active || active instanceof IText || active.locked) return;
+    active.set("gimageTextProtected", protectedObject);
     this.commit();
   }
 

@@ -191,6 +191,17 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
               />
             </label>
           )}
+          {!text && !sel.isMulti && (
+            <button
+              type="button"
+              onClick={() => engine.setTextProtected(!sel.textProtected)}
+              aria-pressed={sel.textProtected}
+              className={`h-8 shrink-0 rounded-md px-2 text-sm ${sel.textProtected ? "bg-amber-100 text-amber-900" : "text-ink-700 hover:bg-ink-100"}`}
+              title="Prevent text from overlapping this object during bulk generation"
+            >
+              {sel.textProtected ? "Protected from text" : "Protect from text"}
+            </button>
+          )}
           {text && (
             <>
               <IconButton label="Bold" active={text.fontWeight === "bold" || Number(text.fontWeight) >= 600} onClick={() => engine.updateText({ fontWeight: text.fontWeight === "bold" || Number(text.fontWeight) >= 600 ? "normal" : "bold" })}>
