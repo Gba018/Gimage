@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronLeft, ChevronRight, Copy, Maximize, Minus, Plus, Trash2 } from "lucide-react";
 import { DesignPreview } from "@/components/design-preview";
-import { IconButton } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { useEditor } from "./editor-context";
 import type { BulkPreviewState } from "./bulk-panel";
 
@@ -19,9 +19,9 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }
       <div className="flex h-24 shrink-0 items-center gap-3 border-t border-ink-200 bg-white px-3">
         <ol className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-2" aria-label="Bulk rows">
           {onHideBulkRibbon && <li className="shrink-0">
-            <IconButton label="Hide preview ribbon" onClick={onHideBulkRibbon}>
-              <ChevronDown size={17} />
-            </IconButton>
+            <Button size="sm" variant="secondary" className="gap-1" onClick={onHideBulkRibbon} aria-label="Hide preview ribbon">
+              <ChevronDown size={15} /> Hide
+            </Button>
           </li>}
           {bulkPreview.rowPreviews.map(({ index, page }) => (
             <li key={index} className="shrink-0">
