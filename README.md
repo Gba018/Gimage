@@ -1,4 +1,4 @@
-# Lumio — Open-source Canva 
+# Gimage — bulk image generation from templates
 
 Lumio is an independent, MIT-licensed design editor you can self-host. Create graphics from templates or a blank canvas, edit multi-page designs, then export or share them. Lumio is inspired by Canva and is not affiliated with Canva.
 
