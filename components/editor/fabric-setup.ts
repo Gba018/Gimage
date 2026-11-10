@@ -34,7 +34,7 @@ export function configureFabric(): void {
 
 export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField"];
 const IMAGE_FIELD_SRC = /^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/;
-const DYNAMIC_IMAGE_PLACEHOLDER = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+export const DEFAULT_DYNAMIC_IMAGE_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 function normalizeDynamicImages(object: SerializedObject): SerializedObject {
   const next = { ...object };
@@ -42,7 +42,7 @@ function normalizeDynamicImages(object: SerializedObject): SerializedObject {
     const match = next.src.trim().match(IMAGE_FIELD_SRC);
     if (match) {
       next.gimageImageField = typeof next.gimageImageField === "string" && next.gimageImageField ? next.gimageImageField : match[1];
-      next.src = DYNAMIC_IMAGE_PLACEHOLDER;
+      next.src = DEFAULT_DYNAMIC_IMAGE_SRC;
     }
   }
   if (Array.isArray(next.objects)) next.objects = next.objects.map((child) => normalizeDynamicImages(child as SerializedObject));

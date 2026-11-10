@@ -208,6 +208,16 @@ export function ElementsPanel() {
           </button>
         ))}
       </div>
+      <PanelHeading>Bulk content</PanelHeading>
+      <button
+        type="button"
+        onClick={() => void engine.addDynamicImage()}
+        className="flex w-full items-center gap-3 rounded-lg border border-dashed border-brand-300 bg-brand-50 p-3 text-left text-brand-800 hover:bg-brand-100"
+        aria-label="Add dynamic image placeholder"
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-md bg-brand-100 text-brand-700"><ImageIcon size={24} /></span>
+        <span><strong className="block text-sm">Dynamic image</strong><span className="text-xs text-brand-700">Ready for {'{{image_url}}'} from Sheets</span></span>
+      </button>
       <PanelHeading>Lines</PanelHeading>
       <div className="grid grid-cols-4 gap-2">
         {lines.map((s) => (

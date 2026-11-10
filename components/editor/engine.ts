@@ -4,7 +4,7 @@ import { ActiveSelection, Canvas, FabricImage, FabricObject, Group, IText, Point
 import { loadFonts } from "@/lib/design/fonts";
 import { MAX_OBJECTS_PER_PAGE, newPageId, type DesignDoc, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { scaleObjects } from "@/lib/design/scale";
-import { applyLockState, backgroundFill, collectFonts, configureFabric, enlivenSafe, SERIALIZE_PROPS, uid } from "./fabric-setup";
+import { applyLockState, backgroundFill, collectFonts, configureFabric, DEFAULT_DYNAMIC_IMAGE_SRC, enlivenSafe, SERIALIZE_PROPS, uid } from "./fabric-setup";
 
 export type TextProps = {
   fontFamily: string;
@@ -606,6 +606,11 @@ export class EditorEngine {
     this.canvas.add(img);
     this.select([img]);
     this.commit();
+  }
+
+  async addDynamicImage(field = "image_url", at?: { x: number; y: number }): Promise<void> {
+    await this.addImage(DEFAULT_DYNAMIC_IMAGE_SRC, "Dynamic image", at);
+    this.setSelectedImageField(field);
   }
 
   async setBackgroundImage(url: string): Promise<void> {
