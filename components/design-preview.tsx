@@ -16,6 +16,7 @@ export function DesignPreview({
   alt,
   maxSize = 480,
   fit = "cover",
+  zoom = 1,
 }: {
   page: PageData;
   width: number;
@@ -24,6 +25,7 @@ export function DesignPreview({
   alt: string;
   maxSize?: number;
   fit?: "cover" | "contain";
+  zoom?: number;
 }) {
   const cached = cache.get(page)?.get(maxSize) ?? null;
   const [rendered, setRendered] = useState<{ page: PageData; size: number; src: string } | null>(null);
@@ -48,12 +50,14 @@ export function DesignPreview({
     };
   }, [page, width, height, maxSize]);
   return (
-    <div className={`relative overflow-hidden bg-ink-100 ${className}`} style={fit === "cover" ? { aspectRatio: `${width} / ${height}` } : undefined}>
+    <div className={`relative flex min-h-0 items-center justify-center overflow-auto bg-ink-100 ${className}`} style={{ aspectRatio: `${width} / ${height}` }}>
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- data URL rendered client-side
-        <img src={src} alt={alt} className={`absolute inset-0 h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`} draggable={false} />
+        <div className="relative shrink-0" style={{ width: `${Math.max(1, zoom) * 100}%`, aspectRatio: `${width} / ${height}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- data URL rendered client-side */}
+          <img src={src} alt={alt} className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`} draggable={false} />
+        </div>
       ) : (
-        <div className="absolute inset-0 animate-pulse bg-ink-100" aria-hidden="true" />
+        <div className="h-full w-full animate-pulse bg-ink-100" aria-hidden="true" />
       )}
     </div>
   );
