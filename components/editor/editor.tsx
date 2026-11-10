@@ -602,14 +602,6 @@ export function Editor({ design }: { design: EditorDesign }) {
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>
               )}
-              {panel === "bulk" && bulkPreview && <div className="flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white/80 p-2 shadow-sm">
-                  {bulkPreview.rowPreviews.map(({ index, page }) => (
-                    <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
-                      <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
-                      <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
-                    </button>
-                  ))}
-                </div>}
               <div ref={hostRef} className={`${panel === "bulk" && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
             </div>
             {panning && (
@@ -637,6 +629,16 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
+          {panel === "bulk" && bulkPreview && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
+            <div className="mx-auto flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white p-2">
+              {bulkPreview.rowPreviews.map(({ index, page }) => (
+                <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
+                  <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
+                  <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
+                </button>
+              ))}
+            </div>
+          </div>}
           {panel === "bulk" && bulkPreview ? null : ctx && (
             <EditorContext value={ctx}>
               <PageStrip onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />

@@ -21,11 +21,14 @@ export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: Pag
       const next = Math.min(1, availableWidth / width, availableHeight / height);
       setFitScale(Number.isFinite(next) && next > 0 ? next : 1);
     };
-    updateFitScale();
+    const frame = window.requestAnimationFrame(updateFitScale);
     const observer = new ResizeObserver(updateFitScale);
     observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [width, height]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [page, width, height]);
 
   useEffect(() => {
     const element = canvasRef.current;
