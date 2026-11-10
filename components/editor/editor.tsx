@@ -645,16 +645,19 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
-          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && <div className="relative z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
-            <button type="button" className="absolute left-2 top-2 z-10 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(false)} aria-label="Hide preview ribbon">Hide ribbon</button>
-            <div className="mx-auto flex w-[min(90vw,1100px)] items-start gap-2 pt-1">
-              <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto rounded-lg bg-white p-2">
-              {bulkPreview.rowPreviews.map(({ index, page }) => (
-                <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
-                  <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
-                  <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
-                </button>
-              ))}
+          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
+            <div className="mx-auto w-[min(90vw,1100px)]">
+              <div className="flex h-8 items-center justify-between border-b border-ink-100 px-1">
+                <span className="text-[11px] font-medium text-ink-500">Bulk rows</span>
+                <button type="button" className="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(false)} aria-label="Hide preview ribbon">Hide ribbon</button>
+              </div>
+              <div className="flex min-w-0 gap-2 overflow-x-auto rounded-lg bg-white p-2">
+                {bulkPreview.rowPreviews.map(({ index, page }) => (
+                  <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
+                    <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
+                    <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>}
