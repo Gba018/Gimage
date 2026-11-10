@@ -89,12 +89,8 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
 
   useEffect(() => {
     if (!onPreviewChange) return;
-    if (!previewData || !data) {
-      onPreviewChange(null);
-      return;
-    }
+    if (!previewData || !data) return;
     onPreviewChange({ page: previewData.pages[activePreviewPage], pages: previewData.pages, width: previewData.width, height: previewData.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, rowPreviews, setPage: changePreviewPage, setRow: changePreviewRow, setZoom: changePreviewZoom });
-    return () => onPreviewChange(null);
   }, [onPreviewChange, previewData, rowPreviews, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewRow, changePreviewZoom]);
 
   function setRows(next: CsvData) {

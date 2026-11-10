@@ -6,6 +6,8 @@ import {
   CloudUpload,
   FileSpreadsheet,
   Download,
+  Eye,
+  EyeOff,
   History,
   Home,
   Keyboard,
@@ -97,6 +99,14 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [dropActive, setDropActive] = useState(false);
   const [participants, setParticipants] = useState<{ id: string; name: string }[]>([]);
   const [bulkPreview, setBulkPreview] = useState<BulkPreviewState | null>(null);
+  const [bulkPreviewVisible, setBulkPreviewVisible] = useState(false);
+  const [bulkRibbonVisible, setBulkRibbonVisible] = useState(true);
+
+  const handleBulkPreviewChange = useCallback((preview: BulkPreviewState | null) => {
+    const wasEmpty = bulkPreview === null;
+    setBulkPreview(preview);
+    if (preview && wasEmpty) setBulkPreviewVisible(true);
+  }, [bulkPreview]);
 
   const notify = useCallback((message: string, tone: "info" | "error" = "info") => {
     const id = Date.now() + Math.random();
@@ -479,6 +489,12 @@ export function Editor({ design }: { design: EditorDesign }) {
           <IconButton label="Keyboard shortcuts (?)" className="hidden text-white hover:bg-white/15 sm:inline-flex" onClick={() => setDialog("shortcuts")}>
             <Keyboard size={17} />
           </IconButton>
+          {bulkPreview && <IconButton label={bulkPreviewVisible ? "Hide bulk preview" : "Show bulk preview"} className="text-white hover:bg-white/15" onClick={() => setBulkPreviewVisible((visible) => !visible)}>
+            {bulkPreviewVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+          </IconButton>}
+          {bulkPreview && <IconButton label={bulkRibbonVisible ? "Hide preview ribbon" : "Show preview ribbon"} className="text-white hover:bg-white/15" onClick={() => setBulkRibbonVisible((visible) => !visible)}>
+            {bulkRibbonVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+          </IconButton>}
           <Button size="sm" variant="glass" className="ml-1" onClick={() => setDialog("share")} disabled={!engine}>
             <Share2 size={15} /> <span className="hidden sm:inline">Share</span>
           </Button>
@@ -512,7 +528,10 @@ export function Editor({ design }: { design: EditorDesign }) {
             <button
               key={id}
               type="button"
-              onClick={() => setPanel((p) => (p === id ? null : id))}
+              onClick={() => {
+                if (id === "bulk") setBulkPreviewVisible(true);
+                setPanel((p) => (p === id ? null : id));
+              }}
               aria-pressed={panel === id}
               className={`flex min-w-[68px] flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium md:mx-1.5 md:rounded-lg ${panel === id ? "text-brand-700 md:bg-brand-50" : "text-ink-500 hover:text-ink-900"}`}
             >
@@ -523,14 +542,14 @@ export function Editor({ design }: { design: EditorDesign }) {
         </nav>
 
         {/* Side panel */}
-        {panel && (
-          <aside className="relative max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-ink-200 bg-white p-4 md:max-h-none md:w-[320px] md:border-r md:border-t-0" aria-label={`${PANELS.find((p) => p.id === panel)?.label} panel`}>
-            <div className="mb-3 flex items-center justify-between">
+        {(panel || bulkPreview) && (
+          <aside className={`relative max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-ink-200 bg-white p-4 md:max-h-none md:w-[320px] md:border-r md:border-t-0 ${panel ? "" : "hidden"}`} aria-label={`${PANELS.find((p) => p.id === panel)?.label ?? "Bulk create"} panel`}>
+            {panel && <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-ink-900">{PANELS.find((p) => p.id === panel)?.label}</h2>
               <IconButton label="Close panel" onClick={() => setPanel(null)}>
                 <X size={16} />
               </IconButton>
-            </div>
+            </div>}
             {ctx ? (
               <EditorContext value={ctx}>
                 {panel === "templates" && <TemplatesPanel />}
@@ -538,7 +557,9 @@ export function Editor({ design }: { design: EditorDesign }) {
                 {panel === "elements" && <ElementsPanel />}
                 {panel === "text" && <TextPanel />}
                 {panel === "uploads" && <UploadsPanel />}
-                {panel === "bulk" && <BulkPanel onPreviewChange={setBulkPreview} />}
+                <div className={panel === "bulk" ? "" : "hidden"}>
+                  <BulkPanel onPreviewChange={handleBulkPreviewChange} />
+                </div>
                 {panel === "brand" && <BrandKitPanel />}
                 {panel === "background" && <BackgroundPanel />}
                 {panel === "layers" && <LayersPanel />}
@@ -581,8 +602,8 @@ export function Editor({ design }: { design: EditorDesign }) {
               if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.workspace) engine?.deselect();
             }}
           >
-            <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${panel === "bulk" && bulkPreview ? "flex-col gap-4" : ""}`}>
-              {panel === "bulk" && bulkPreview && (
+            <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${bulkPreviewVisible && bulkPreview ? "flex-col gap-4" : ""}`}>
+              {bulkPreviewVisible && bulkPreview && (
                 <div className="w-[min(90vw,1100px)]">
                   <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs text-ink-700 shadow-sm">
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.row === 0} onClick={() => bulkPreview.setRow(bulkPreview.row - 1)}>‹ Row</button>
@@ -602,7 +623,7 @@ export function Editor({ design }: { design: EditorDesign }) {
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>
               )}
-              <div ref={hostRef} className={`${panel === "bulk" && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
+              <div ref={hostRef} className={`${bulkPreviewVisible && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
             </div>
             {panning && (
               <div
@@ -629,7 +650,7 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
-          {panel === "bulk" && bulkPreview && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
+          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
             <div className="mx-auto flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white p-2">
               {bulkPreview.rowPreviews.map(({ index, page }) => (
                 <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
@@ -639,7 +660,7 @@ export function Editor({ design }: { design: EditorDesign }) {
               ))}
             </div>
           </div>}
-          {panel === "bulk" && bulkPreview ? null : ctx && (
+          {bulkPreviewVisible && bulkPreview ? null : ctx && (
             <EditorContext value={ctx}>
               <PageStrip onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />
             </EditorContext>
