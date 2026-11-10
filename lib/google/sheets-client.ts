@@ -55,10 +55,11 @@ export async function listSheetTabs(spreadsheetId: string): Promise<string[]> {
 export async function readSheet(spreadsheetId: string, sheetName: string, range: string): Promise<BulkData> {
   const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(buildSheetRange(sheetName, range))}`);
   const data = await googleFetch(url.toString());
-  const rows = (data.values ?? []).map((row: unknown) => Array.isArray(row) ? row.map((cell) => String(cell ?? "")) : []);
-  const headers = (rows.shift() ?? []).map((header, index) => header.trim() || `Column ${index + 1}`);
+  const rawRows: unknown[] = Array.isArray(data.values) ? data.values : [];
+  const rows: string[][] = rawRows.map((row: unknown): string[] => Array.isArray(row) ? row.map((cell: unknown) => String(cell ?? "")) : []);
+  const headers = (rows.shift() ?? []).map((header: string, index: number) => header.trim() || `Column ${index + 1}`);
   if (!headers.length || headers.some((header) => !header) || new Set(headers).size !== headers.length) throw new Error("Google Sheets necesita encabezados únicos y no vacíos.");
-  const normalized = rows.map((row) => headers.map((_, index) => row[index] ?? ""));
+  const normalized = rows.map((row: string[]) => headers.map((_header: string, index: number) => row[index] ?? ""));
   if (!normalized.length) throw new Error("La hoja no contiene filas de datos.");
   return { headers, rows: normalized };
 }
