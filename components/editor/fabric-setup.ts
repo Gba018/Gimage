@@ -1,7 +1,7 @@
 "use client";
 
 import { FabricObject, Gradient, Group, InteractiveFabricObject, StaticCanvas, util, type BaseFabricObject, type TFiller } from "fabric";
-import type { PageBackground, PageData, SerializedObject } from "@/lib/design/types";
+import { DEFAULT_DYNAMIC_IMAGE_SRC, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { loadFonts } from "@/lib/design/fonts";
 
 declare module "fabric" {
@@ -34,7 +34,6 @@ export function configureFabric(): void {
 
 export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField"];
 const IMAGE_FIELD_SRC = /^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/;
-export const DEFAULT_DYNAMIC_IMAGE_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 function normalizeDynamicImages(object: SerializedObject): SerializedObject {
   const next = { ...object };

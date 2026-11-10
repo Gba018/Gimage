@@ -62,9 +62,10 @@ export const ALLOWED_OBJECT_TYPES = new Set([
 
 const SAFE_IMAGE_SRC = /^(\/api\/uploads\/[A-Za-z0-9_-]{8,64}|data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+)$/;
 const IMAGE_FIELD_SRC = /^\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}$/;
+export const DEFAULT_DYNAMIC_IMAGE_SRC = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2U1ZTdlYiIvPjxjaXJjbGUgY3g9IjEyMCIgY3k9IjEwMCIgcj0iMzAiIGZpbGw9IiM5NGEzYjgiLz48cGF0aCBkPSJNMjAgMjYwTDE1MCAxMzBMMjIwIDIwMEwyODAgMTQwTDM4MCAyNjBaIiBmaWxsPSIjNjQ3NDhiIi8+PC9zdmc+";
 
 export function isSafeImageSrc(src: unknown): boolean {
-  return typeof src === "string" && (SAFE_IMAGE_SRC.test(src) || IMAGE_FIELD_SRC.test(src));
+  return typeof src === "string" && (SAFE_IMAGE_SRC.test(src) || IMAGE_FIELD_SRC.test(src) || src === DEFAULT_DYNAMIC_IMAGE_SRC);
 }
 
 /**
