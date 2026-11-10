@@ -593,8 +593,8 @@ export function Editor({ design }: { design: EditorDesign }) {
                     <span className="min-w-20 text-center">Page {bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)}>Page ›</button>
                     <span className="mx-1 h-5 w-px bg-ink-200" />
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 0.5} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.1)} aria-label="Zoom out">−</button>
-                    <input aria-label="Preview zoom" type="range" min={0.5} max={3} step={0.1} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 1} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.1)} aria-label="Zoom out">−</button>
+                    <input aria-label="Preview zoom" type="range" min={1} max={3} step={0.1} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
                     <span className="w-12 text-center tabular-nums">{Math.round(bulkPreview.zoom * 100)}%</span>
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.1)} aria-label="Zoom in">+</button>
                     <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)} title="Mostrar el lienzo a su tamaño nativo">100% real</button>

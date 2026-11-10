@@ -85,7 +85,7 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
 
   const changePreviewPage = useCallback((index: number) => setPreviewPage(index), []);
   const changePreviewRow = useCallback((index: number) => setRow(index), []);
-  const changePreviewZoom = useCallback((zoom: number) => setPreviewZoom(Math.max(0.5, Math.min(3, zoom))), []);
+  const changePreviewZoom = useCallback((zoom: number) => setPreviewZoom(Math.max(1, Math.min(3, zoom))), []);
 
   useEffect(() => {
     if (!onPreviewChange) return;

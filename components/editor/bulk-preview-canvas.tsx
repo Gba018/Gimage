@@ -37,9 +37,15 @@ export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: Pag
     };
   }, [page, width, height]);
 
+  const safeZoom = Math.max(1, zoom);
+  const canvasWidth = width * safeZoom;
+  const canvasHeight = height * safeZoom;
+
   return (
-    <div className="relative max-h-[36rem] max-w-full overflow-auto rounded-lg bg-ink-100 p-3 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
-      <canvas ref={canvasRef} style={{ width: `${width * Math.max(0.5, zoom)}px`, height: `${height * Math.max(0.5, zoom)}px`, maxWidth: "none", display: "block", margin: "auto" }} />
+    <div className="relative max-h-[36rem] max-w-full overflow-auto rounded-lg bg-ink-100 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
+      <div className="flex min-h-full min-w-full items-center justify-center p-3" style={{ width: `${canvasWidth + 24}px`, minHeight: `${canvasHeight + 24}px` }}>
+        <canvas ref={canvasRef} style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`, maxWidth: "none", display: "block" }} />
+      </div>
       {error && <p role="alert" className="absolute inset-x-3 top-3 rounded bg-white/95 p-3 text-xs text-danger-600 shadow">{error}</p>}
     </div>
   );
