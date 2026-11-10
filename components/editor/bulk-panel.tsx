@@ -22,7 +22,9 @@ export type BulkPreviewState = {
   totalRows: number;
   pageIndex: number;
   zoom: number;
+  rowPreviews: { index: number; page: PageData }[];
   setPage: (index: number) => void;
+  setRow: (index: number) => void;
   setZoom: (zoom: number) => void;
 };
 
@@ -67,6 +69,13 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
   const resolved = useMemo(() => Object.fromEntries(fields.map((field) => [field, Object.hasOwn(mapping, field) ? mapping[field] : (data?.headers.includes(field) ? field : "")])), [fields, mapping, data]);
   const mapped = !!data && fields.length > 0 && fields.every((field) => data.headers.includes(resolved[field]));
   const previewData = useMemo(() => data && mapped ? fillTemplate(doc, data, row, resolved) : null, [data, mapped, doc, row, resolved]);
+  const rowPreviews = useMemo(() => {
+    if (!data || !mapped) return [];
+    return data.rows.map((_, index) => {
+      try { return { index, page: fillTemplate(doc, data, index, resolved).pages[0] }; }
+      catch { return null; }
+    }).filter((item): item is { index: number; page: PageData } => item !== null);
+  }, [data, mapped, doc, resolved]);
   // The preview is rendered by the main editor workspace; this keeps the
   // legacy lateral branch type-safe while making it permanently inactive.
   const preview = null as unknown as NonNullable<typeof previewData>;
@@ -75,6 +84,7 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
   const allSelected = !!data && selectedCount === data.rows.length;
 
   const changePreviewPage = useCallback((index: number) => setPreviewPage(index), []);
+  const changePreviewRow = useCallback((index: number) => setRow(index), []);
   const changePreviewZoom = useCallback((zoom: number) => setPreviewZoom(Math.max(0.5, Math.min(3, zoom))), []);
 
   useEffect(() => {
@@ -83,9 +93,9 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
       onPreviewChange(null);
       return;
     }
-    onPreviewChange({ page: previewData.pages[activePreviewPage], pages: previewData.pages, width: previewData.width, height: previewData.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, setPage: changePreviewPage, setZoom: changePreviewZoom });
+    onPreviewChange({ page: previewData.pages[activePreviewPage], pages: previewData.pages, width: previewData.width, height: previewData.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, rowPreviews, setPage: changePreviewPage, setRow: changePreviewRow, setZoom: changePreviewZoom });
     return () => onPreviewChange(null);
-  }, [onPreviewChange, previewData, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewZoom]);
+  }, [onPreviewChange, previewData, rowPreviews, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewRow, changePreviewZoom]);
 
   function setRows(next: CsvData) {
     if (next.rows.length > MAX_CSV_ROWS) throw new Error(`Google Sheets supports up to ${MAX_CSV_ROWS} data rows per batch.`);

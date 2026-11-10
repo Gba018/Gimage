@@ -584,21 +584,29 @@ export function Editor({ design }: { design: EditorDesign }) {
             <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${panel === "bulk" && bulkPreview ? "flex-col gap-4" : ""}`}>
               {panel === "bulk" && bulkPreview && (
                 <div className="w-[min(90vw,1100px)]">
-                  <div className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs text-ink-700 shadow-sm">
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 0.5} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.25)} aria-label="Zoom out">−</button>
-                    <input aria-label="Preview zoom" type="range" min={0.5} max={3} step={0.25} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
+                  <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs text-ink-700 shadow-sm">
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.row === 0} onClick={() => bulkPreview.setRow(bulkPreview.row - 1)}>‹ Row</button>
+                    <span className="min-w-24 text-center">Row {bulkPreview.row + 1} / {bulkPreview.totalRows}</span>
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.row >= bulkPreview.totalRows - 1} onClick={() => bulkPreview.setRow(bulkPreview.row + 1)}>Row ›</button>
+                    <span className="mx-1 h-5 w-px bg-ink-200" />
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex === 0} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex - 1)}>‹ Page</button>
+                    <span className="min-w-20 text-center">Page {bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)}>Page ›</button>
+                    <span className="mx-1 h-5 w-px bg-ink-200" />
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 0.5} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.1)} aria-label="Zoom out">−</button>
+                    <input aria-label="Preview zoom" type="range" min={0.5} max={3} step={0.1} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
                     <span className="w-12 text-center tabular-nums">{Math.round(bulkPreview.zoom * 100)}%</span>
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.25)} aria-label="Zoom in">+</button>
-                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)}>Fit</button>
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.1)} aria-label="Zoom in">+</button>
+                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)} title="Mostrar el lienzo a su tamaño nativo">100% real</button>
                   </div>
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>
               )}
               {panel === "bulk" && bulkPreview && <div className="flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white/80 p-2 shadow-sm">
-                  {bulkPreview.pages.map((page, index) => (
-                    <button key={page.id} type="button" aria-label={`Preview page ${index + 1}`} aria-pressed={index === bulkPreview.pageIndex} onClick={() => bulkPreview.setPage(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.pageIndex ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
-                      <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Page ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
-                      <span className="block py-1 text-center text-[10px]">Page {index + 1}</span>
+                  {bulkPreview.rowPreviews.map(({ index, page }) => (
+                    <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
+                      <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
+                      <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
                     </button>
                   ))}
                 </div>}
