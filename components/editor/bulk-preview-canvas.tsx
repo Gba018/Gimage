@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PageData } from "@/lib/design/types";
 import { renderPage } from "./fabric-setup";
 
-export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: PageData; width: number; height: number; zoom?: number }) {
+export function BulkPreviewCanvas({ page, width, height, zoom = 1, baseScale }: { page: PageData; width: number; height: number; zoom?: number; baseScale?: number }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(1);
   const [src, setSrc] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: Pag
     return () => { cancelled = true; };
   }, [page, width, height]);
 
-  const displayScale = fitScale * Math.max(1, zoom);
+  const displayScale = (baseScale ?? fitScale) * Math.max(1, zoom);
   const canvasWidth = width * displayScale;
   const canvasHeight = height * displayScale;
 

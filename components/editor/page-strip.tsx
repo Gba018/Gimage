@@ -56,7 +56,7 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideRibbon, zoom
 
   const currentZoom = zoomValue ?? state.zoom;
   const zoomPct = Math.round(currentZoom * 100);
-  const steps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
+  const steps = [1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
   const stepZoom = (dir: 1 | -1) => {
     const z = currentZoom;
     const next = dir > 0 ? steps.find((s) => s > z + 0.001) : [...steps].reverse().find((s) => s < z - 0.001);
@@ -125,9 +125,9 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideRibbon, zoom
         <input
           type="range"
           aria-label="Zoom"
-          min={5}
-          max={400}
-          value={Math.min(400, zoomPct)}
+          min={100}
+          max={300}
+          value={Math.min(300, Math.max(100, zoomPct))}
           onChange={(e) => {
             onManualZoom();
             const next = Number(e.target.value) / 100;

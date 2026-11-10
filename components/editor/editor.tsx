@@ -101,6 +101,7 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [bulkPreviewVisible, setBulkPreviewVisible] = useState(false);
   const [ribbonVisible, setRibbonVisible] = useState(true);
   const [sharedZoom, setSharedZoom] = useState(1);
+  const [editorFitScale, setEditorFitScale] = useState(1);
 
   const handleBulkPreviewChange = useCallback((preview: BulkPreviewState | null) => {
     const wasEmpty = bulkPreview === null;
@@ -112,8 +113,8 @@ export function Editor({ design }: { design: EditorDesign }) {
     const next = Math.max(1, Math.min(3, zoom));
     setSharedZoom(next);
     if (bulkPreviewVisible && bulkPreview) bulkPreview.setZoom(next);
-    else engine?.setZoom(next);
-  }, [bulkPreview, bulkPreviewVisible, engine]);
+    else engine?.setZoom(editorFitScale * next);
+  }, [bulkPreview, bulkPreviewVisible, editorFitScale, engine]);
 
   const notify = useCallback((message: string, tone: "info" | "error" = "info") => {
     const id = Date.now() + Math.random();
@@ -248,7 +249,10 @@ export function Editor({ design }: { design: EditorDesign }) {
     autoFit.current = true;
     const inner = el.firstElementChild as HTMLElement | null;
     const pad = inner ? parseFloat(getComputedStyle(inner).paddingLeft) || 0 : 0;
-    eng.setZoom(eng.fitZoom(el.clientWidth, el.clientHeight, pad + 8));
+    const next = eng.fitZoom(el.clientWidth, el.clientHeight, pad + 8);
+    setEditorFitScale(next);
+    setSharedZoom(1);
+    eng.setZoom(next);
   }, []);
 
   useEffect(() => {
@@ -286,10 +290,6 @@ export function Editor({ design }: { design: EditorDesign }) {
 
   const subscribe = useCallback((cb: () => void) => (engine ? engine.subscribe(cb) : () => undefined), [engine]);
   const state = useSyncExternalStore(subscribe, () => engine?.getState() ?? EMPTY_STATE, () => EMPTY_STATE);
-
-  useEffect(() => {
-    if (!bulkPreviewVisible) setSharedZoom(state.zoom);
-  }, [bulkPreviewVisible, state.zoom]);
 
   useEffect(() => {
     if (!bulkPreviewVisible || !bulkPreview) return;
@@ -626,7 +626,7 @@ export function Editor({ design }: { design: EditorDesign }) {
                     <span className="min-w-20 text-center">Page {bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)}>Page ›</button>
                   </div>
-                  <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
+                  <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} baseScale={editorFitScale} />
                 </div>
               )}
               <div ref={hostRef} className={`${bulkPreviewVisible && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
@@ -666,7 +666,7 @@ export function Editor({ design }: { design: EditorDesign }) {
           </div>}
           {!bulkPreviewVisible && ctx && (
             <EditorContext value={ctx}>
-              {ribbonVisible && <PageStrip zoomValue={state.zoom} onZoomChange={changeSharedZoom} onHideRibbon={() => setRibbonVisible(false)} onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />}
+              {ribbonVisible && <PageStrip zoomValue={sharedZoom} onZoomChange={changeSharedZoom} onHideRibbon={() => setRibbonVisible(false)} onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />}
               {!ribbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-sm">
                 <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setRibbonVisible(true)} aria-label="Show editor ribbon">Show ribbon</button>
               </div>}
