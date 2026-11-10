@@ -44,7 +44,6 @@ import { PageStrip } from "./page-strip";
 import { useShortcuts } from "./use-shortcuts";
 import { uploadImage } from "./uploads";
 import { text as textBuilder } from "@/lib/design/builders";
-import { BulkPreviewCanvas } from "./bulk-preview-canvas";
 import type { BulkPreviewState } from "./bulk-panel";
 
 export type EditorDesign = { id: string; title: string; doc: DesignDoc; shareToken: string | null; revision: number };
@@ -296,6 +295,12 @@ export function Editor({ design }: { design: EditorDesign }) {
     const next = Math.max(1, Math.min(3, sharedZoom));
     if (bulkPreview.zoom !== next) bulkPreview.setZoom(next);
   }, [bulkPreview, bulkPreviewVisible, sharedZoom]);
+
+  useEffect(() => {
+    if (!engine) return;
+    if (bulkPreviewVisible && bulkPreview) void engine.showPreview(bulkPreview.page);
+    else void engine.hidePreview();
+  }, [engine, bulkPreviewVisible, bulkPreview?.page]);
 
   // Refit when the design is resized.
   const lastSize = useRef(`${design.doc.width}x${design.doc.height}`);
@@ -615,12 +620,7 @@ export function Editor({ design }: { design: EditorDesign }) {
             }}
           >
             <div data-workspace="1" className={`flex min-h-full min-w-full ${bulkPreviewVisible && bulkPreview ? "w-full flex-col gap-4" : "w-max"} items-center justify-center p-6 sm:p-12`}>
-              {bulkPreviewVisible && bulkPreview && (
-                <div className="w-[min(90vw,1100px)]">
-                  <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} baseScale={editorFitScale} />
-                </div>
-              )}
-              <div ref={hostRef} className={`${bulkPreviewVisible && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
+              <div ref={hostRef} className="shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]" />
             </div>
             {panning && (
               <div

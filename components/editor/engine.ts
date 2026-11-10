@@ -115,6 +115,7 @@ export class EditorEngine {
   private state: EngineState;
   private revision = 0;
   private disposed = false;
+  private previewMode = false;
   private onDocChange: () => void;
 
   constructor(el: HTMLCanvasElement, doc: DesignDoc, onDocChange: () => void) {
@@ -350,7 +351,7 @@ export class EditorEngine {
 
   /** Records the current canvas into the document and history. */
   commit(): void {
-    if (this.loading || this.disposed) return;
+    if (this.loading || this.disposed || this.previewMode) return;
     this.flush();
     const snap = this.snapshot();
     if (snap !== this.current) {
@@ -466,6 +467,38 @@ export class EditorEngine {
     this.guides = [];
     this.loading = false;
     c.requestRenderAll();
+  }
+
+  /** Renders a filled Bulk Create page into this same editor canvas in read-only mode. */
+  async showPreview(page: PageData): Promise<void> {
+    const token = ++this.loadToken;
+    this.loading = true;
+    this.previewMode = true;
+    await loadFonts(collectFonts(page.objects));
+    const objects = await enlivenSafe(page.objects, false, true);
+    if (token !== this.loadToken || this.disposed) return;
+    const c = this.canvas;
+    c.discardActiveObject();
+    c.remove(...c.getObjects());
+    for (const object of objects) {
+      object.set({ selectable: false, evented: false, hasControls: false, hoverCursor: "default" });
+      c.add(object);
+    }
+    c.selection = false;
+    c.backgroundColor = backgroundFill(page.background, this.width, this.height);
+    this.guides = [];
+    this.loading = false;
+    c.requestRenderAll();
+    this.emit();
+  }
+
+  /** Restores the active editable document page after leaving Bulk preview. */
+  async hidePreview(): Promise<void> {
+    if (!this.previewMode || this.disposed) return;
+    this.previewMode = false;
+    this.canvas.selection = true;
+    await this.loadPage(this.active);
+    this.emit();
   }
 
   private prepare(obj: FabricObject): void {
