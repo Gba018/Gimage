@@ -2,9 +2,9 @@
 
 import { ActiveSelection, Canvas, FabricImage, FabricObject, Group, IText, Point, filters, type TPointerEventInfo } from "fabric";
 import { loadFonts } from "@/lib/design/fonts";
-import { MAX_OBJECTS_PER_PAGE, newPageId, type DesignDoc, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
+import { DEFAULT_DYNAMIC_IMAGE_SRC, MAX_OBJECTS_PER_PAGE, newPageId, type DesignDoc, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { scaleObjects } from "@/lib/design/scale";
-import { applyLockState, backgroundFill, collectFonts, configureFabric, DEFAULT_DYNAMIC_IMAGE_SRC, enlivenSafe, SERIALIZE_PROPS, uid } from "./fabric-setup";
+import { applyLockState, backgroundFill, collectFonts, configureFabric, enlivenSafe, SERIALIZE_PROPS, uid } from "./fabric-setup";
 
 export type TextProps = {
   fontFamily: string;
