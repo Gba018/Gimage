@@ -584,6 +584,13 @@ export function Editor({ design }: { design: EditorDesign }) {
             <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${panel === "bulk" && bulkPreview ? "flex-col gap-4" : ""}`}>
               {panel === "bulk" && bulkPreview && (
                 <div className="w-[min(90vw,1100px)]">
+                  <div className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs text-ink-700 shadow-sm">
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 0.5} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.25)} aria-label="Zoom out">−</button>
+                    <input aria-label="Preview zoom" type="range" min={0.5} max={3} step={0.25} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
+                    <span className="w-12 text-center tabular-nums">{Math.round(bulkPreview.zoom * 100)}%</span>
+                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.25)} aria-label="Zoom in">+</button>
+                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)}>Fit</button>
+                  </div>
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>
               )}
