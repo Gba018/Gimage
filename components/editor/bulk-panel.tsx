@@ -67,7 +67,9 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
   const resolved = useMemo(() => Object.fromEntries(fields.map((field) => [field, Object.hasOwn(mapping, field) ? mapping[field] : (data?.headers.includes(field) ? field : "")])), [fields, mapping, data]);
   const mapped = !!data && fields.length > 0 && fields.every((field) => data.headers.includes(resolved[field]));
   const previewData = useMemo(() => data && mapped ? fillTemplate(doc, data, row, resolved) : null, [data, mapped, doc, row, resolved]);
-  const preview: typeof previewData = null;
+  // The preview is rendered by the main editor workspace; this keeps the
+  // legacy lateral branch type-safe while making it permanently inactive.
+  const preview = null as unknown as NonNullable<typeof previewData>;
   const activePreviewPage = previewData ? Math.min(previewPage, Math.max(0, previewData.pages.length - 1)) : 0;
   const selectedCount = selectedRows.size;
   const allSelected = !!data && selectedCount === data.rows.length;
