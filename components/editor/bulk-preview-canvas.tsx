@@ -45,8 +45,8 @@ export function BulkPreviewCanvas({ page, width, height, zoom = 1, baseScale }: 
   const canvasHeight = height * displayScale;
 
   return (
-    <div ref={viewportRef} className="relative max-h-[36rem] max-w-full overflow-auto rounded-lg bg-ink-100 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
-      <div className="flex min-h-full min-w-full items-center justify-center p-3" style={{ width: `${canvasWidth + 24}px`, minHeight: `${canvasHeight + 24}px` }}>
+    <div ref={viewportRef} className="relative max-w-full rounded-lg bg-ink-100 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
+      <div className="flex min-h-full min-w-full items-center justify-center" style={{ width: `${canvasWidth}px`, minWidth: "100%", minHeight: `${canvasHeight}px` }}>
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element -- rendered data URL from the shared Fabric renderer
           <img src={src} alt="Bulk preview" draggable={false} style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`, maxWidth: "none", display: "block" }} />
