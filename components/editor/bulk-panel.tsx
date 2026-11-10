@@ -1,16 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fillTemplate, MAX_CSV_BYTES, MAX_CSV_ROWS, parseCsv, templateFields, type CsvData } from "@/lib/design/csv";
 import { DesignPreview } from "@/components/design-preview";
 import { BulkPreviewCanvas } from "./bulk-preview-canvas";
 import { Button } from "@/components/ui/button";
 import { listDriveSpreadsheets, listSheetTabs, readSheet, type DriveSpreadsheet } from "@/lib/google/sheets-client";
 import { useEditor } from "./editor-context";
+import type { PageData } from "@/lib/design/types";
 
 type Source = "csv" | "sheets";
 type SheetPrefs = { spreadsheetId: string; sheetName: string; range: string };
 const SHEET_PREFS_KEY = "gimage_bulk_sheet_preferences";
+
+export type BulkPreviewState = {
+  page: PageData;
+  pages: PageData[];
+  width: number;
+  height: number;
+  row: number;
+  totalRows: number;
+  pageIndex: number;
+  zoom: number;
+  setPage: (index: number) => void;
+  setZoom: (zoom: number) => void;
+};
 
 function readSheetPrefs(): SheetPrefs | null {
   try {
@@ -26,7 +40,7 @@ function writeSheetPrefs(value: SheetPrefs): void {
   try { localStorage.setItem(SHEET_PREFS_KEY, JSON.stringify(value)); } catch { /* Storage may be disabled. */ }
 }
 
-export function BulkPanel() {
+export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: BulkPreviewState | null) => void }) {
   const { engine, state, notify } = useEditor();
   const [source, setSource] = useState<Source>("sheets");
   const [data, setData] = useState<CsvData | null>(null);
@@ -56,6 +70,19 @@ export function BulkPanel() {
   const activePreviewPage = preview ? Math.min(previewPage, Math.max(0, preview.pages.length - 1)) : 0;
   const selectedCount = selectedRows.size;
   const allSelected = !!data && selectedCount === data.rows.length;
+
+  const changePreviewPage = useCallback((index: number) => setPreviewPage(index), []);
+  const changePreviewZoom = useCallback((zoom: number) => setPreviewZoom(Math.max(1, Math.min(2, zoom))), []);
+
+  useEffect(() => {
+    if (!onPreviewChange) return;
+    if (!preview || !data) {
+      onPreviewChange(null);
+      return;
+    }
+    onPreviewChange({ page: preview.pages[activePreviewPage], pages: preview.pages, width: preview.width, height: preview.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, setPage: changePreviewPage, setZoom: changePreviewZoom });
+    return () => onPreviewChange(null);
+  }, [onPreviewChange, preview, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewZoom]);
 
   function setRows(next: CsvData) {
     if (next.rows.length > MAX_CSV_ROWS) throw new Error(`Google Sheets supports up to ${MAX_CSV_ROWS} data rows per batch.`);

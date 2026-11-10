@@ -42,6 +42,9 @@ import { PageStrip } from "./page-strip";
 import { useShortcuts } from "./use-shortcuts";
 import { uploadImage } from "./uploads";
 import { text as textBuilder } from "@/lib/design/builders";
+import { BulkPreviewCanvas } from "./bulk-preview-canvas";
+import type { BulkPreviewState } from "./bulk-panel";
+import { DesignPreview } from "@/components/design-preview";
 
 export type EditorDesign = { id: string; title: string; doc: DesignDoc; shareToken: string | null; revision: number };
 
@@ -93,6 +96,7 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [panning, setPanning] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const [participants, setParticipants] = useState<{ id: string; name: string }[]>([]);
+  const [bulkPreview, setBulkPreview] = useState<BulkPreviewState | null>(null);
 
   const notify = useCallback((message: string, tone: "info" | "error" = "info") => {
     const id = Date.now() + Math.random();
@@ -427,6 +431,10 @@ export function Editor({ design }: { design: EditorDesign }) {
 
   const ctx = useMemo<EditorContextValue | null>(() => (engine ? { engine, state, designId: design.id, notify } : null), [engine, state, design.id, notify]);
 
+  useEffect(() => {
+    if (panel !== "bulk") setBulkPreview(null);
+  }, [panel]);
+
   const statusView = {
     saved: { icon: <Check size={14} />, text: "Saved" },
     saving: { icon: <Spinner size={12} />, text: "Saving…" },
@@ -530,7 +538,7 @@ export function Editor({ design }: { design: EditorDesign }) {
                 {panel === "elements" && <ElementsPanel />}
                 {panel === "text" && <TextPanel />}
                 {panel === "uploads" && <UploadsPanel />}
-                {panel === "bulk" && <BulkPanel />}
+                {panel === "bulk" && <BulkPanel onPreviewChange={setBulkPreview} />}
                 {panel === "brand" && <BrandKitPanel />}
                 {panel === "background" && <BackgroundPanel />}
                 {panel === "layers" && <LayersPanel />}
@@ -573,8 +581,21 @@ export function Editor({ design }: { design: EditorDesign }) {
               if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.workspace) engine?.deselect();
             }}
           >
-            <div data-workspace="1" className="flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12">
-              <div ref={hostRef} className="shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]" />
+            <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${panel === "bulk" && bulkPreview ? "flex-col gap-4" : ""}`}>
+              {panel === "bulk" && bulkPreview && (
+                <div className="w-[min(90vw,1100px)]">
+                  <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
+                </div>
+              )}
+              {panel === "bulk" && bulkPreview && <div className="flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white/80 p-2 shadow-sm">
+                  {bulkPreview.pages.map((page, index) => (
+                    <button key={page.id} type="button" aria-label={`Preview page ${index + 1}`} aria-pressed={index === bulkPreview.pageIndex} onClick={() => bulkPreview.setPage(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.pageIndex ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
+                      <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Page ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
+                      <span className="block py-1 text-center text-[10px]">Page {index + 1}</span>
+                    </button>
+                  ))}
+                </div>}
+              <div ref={hostRef} className={`${panel === "bulk" && bulkPreview ? "hidden" : "shrink-0 bg-white shadow-[0_2px_12px_rgba(15,13,26,0.12)]"}`} />
             </div>
             {panning && (
               <div
@@ -601,7 +622,7 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
-          {ctx && (
+          {panel === "bulk" && bulkPreview ? null : ctx && (
             <EditorContext value={ctx}>
               <PageStrip onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />
             </EditorContext>
