@@ -597,7 +597,7 @@ export function Editor({ design }: { design: EditorDesign }) {
                     <input aria-label="Preview zoom" type="range" min={1} max={3} step={0.1} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
                     <span className="w-12 text-center tabular-nums">{Math.round(bulkPreview.zoom * 100)}%</span>
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.1)} aria-label="Zoom in">+</button>
-                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)} title="Mostrar el lienzo a su tamaño nativo">100% real</button>
+                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)} title="Mostrar el diseño completo ajustado al área visible">100% · Ajustar</button>
                   </div>
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>

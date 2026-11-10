@@ -8,7 +8,24 @@ import { loadFonts } from "@/lib/design/fonts";
 
 export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: PageData; width: number; height: number; zoom?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const updateFitScale = () => {
+      const availableWidth = Math.max(1, viewport.clientWidth - 24);
+      const availableHeight = Math.max(1, viewport.clientHeight - 24);
+      const next = Math.min(1, availableWidth / width, availableHeight / height);
+      setFitScale(Number.isFinite(next) && next > 0 ? next : 1);
+    };
+    updateFitScale();
+    const observer = new ResizeObserver(updateFitScale);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [width, height]);
 
   useEffect(() => {
     const element = canvasRef.current;
@@ -37,12 +54,15 @@ export function BulkPreviewCanvas({ page, width, height, zoom = 1 }: { page: Pag
     };
   }, [page, width, height]);
 
+  // The user-facing zoom is relative to the fitted canvas:
+  // 100% = the complete design in the available viewport.
   const safeZoom = Math.max(1, zoom);
-  const canvasWidth = width * safeZoom;
-  const canvasHeight = height * safeZoom;
+  const displayScale = fitScale * safeZoom;
+  const canvasWidth = width * displayScale;
+  const canvasHeight = height * displayScale;
 
   return (
-    <div className="relative max-h-[36rem] max-w-full overflow-auto rounded-lg bg-ink-100 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
+    <div ref={viewportRef} className="relative max-h-[36rem] max-w-full overflow-auto rounded-lg bg-ink-100 ring-1 ring-ink-200" aria-label="Bulk preview canvas">
       <div className="flex min-h-full min-w-full items-center justify-center p-3" style={{ width: `${canvasWidth + 24}px`, minHeight: `${canvasHeight + 24}px` }}>
         <canvas ref={canvasRef} style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px`, maxWidth: "none", display: "block" }} />
       </div>
