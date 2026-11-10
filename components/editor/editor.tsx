@@ -617,15 +617,6 @@ export function Editor({ design }: { design: EditorDesign }) {
             <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${bulkPreviewVisible && bulkPreview ? "flex-col gap-4" : ""}`}>
               {bulkPreviewVisible && bulkPreview && (
                 <div className="w-[min(90vw,1100px)]">
-                  <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-xs text-ink-700 shadow-sm">
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.row === 0} onClick={() => bulkPreview.setRow(bulkPreview.row - 1)}>‹ Row</button>
-                    <span className="min-w-24 text-center">Row {bulkPreview.row + 1} / {bulkPreview.totalRows}</span>
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.row >= bulkPreview.totalRows - 1} onClick={() => bulkPreview.setRow(bulkPreview.row + 1)}>Row ›</button>
-                    <span className="mx-1 h-5 w-px bg-ink-200" />
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex === 0} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex - 1)}>‹ Page</button>
-                    <span className="min-w-20 text-center">Page {bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)}>Page ›</button>
-                  </div>
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} baseScale={editorFitScale} />
                 </div>
               )}

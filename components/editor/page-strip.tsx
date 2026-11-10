@@ -37,6 +37,15 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideRibbon, zoom
             </li>
           ))}
         </ol>
+        {bulkPreview.pages.length > 1 && <div className="flex shrink-0 items-center gap-1 border-l border-ink-200 pl-2">
+          <IconButton label="Previous bulk page" onClick={() => bulkPreview.setPage(bulkPreview.pageIndex - 1)} disabled={bulkPreview.pageIndex === 0}>
+            <ChevronLeft size={15} />
+          </IconButton>
+          <span className="w-14 text-center text-xs tabular-nums text-ink-700">{bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
+          <IconButton label="Next bulk page" onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)} disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1}>
+            <ChevronRight size={15} />
+          </IconButton>
+        </div>}
         <div className="flex shrink-0 items-center gap-1">
           <IconButton label="Zoom out" onClick={() => stepBulkZoom(-1)} disabled={(zoomValue ?? bulkPreview.zoom) <= 1}>
             <Minus size={15} />
