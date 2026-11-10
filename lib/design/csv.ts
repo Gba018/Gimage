@@ -1,4 +1,4 @@
-import type { DesignDoc, SerializedObject } from "./types";
+import { DEFAULT_DYNAMIC_IMAGE_SRC, type DesignDoc, type SerializedObject } from "./types";
 
 export const MAX_CSV_ROWS = 500;
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
@@ -103,8 +103,10 @@ export function fillTemplate(doc: DesignDoc, data: CsvData, rowIndex: number, ma
           const column = mapping[field];
           if (!values.has(column)) throw new Error(`Map the image field "${field}" to a CSV column`);
           const value = values.get(column) ?? "";
-          if (!value) throw new Error(`Image field "${field}" is empty`);
-          next.src = value;
+          // Blank/null cells must not abort the whole preview. Keep the
+          // dynamic-image marker and let the renderer show the standard
+          // placeholder inside the image frame.
+          next.src = value.trim() && value.trim().toLowerCase() !== "null" ? value : DEFAULT_DYNAMIC_IMAGE_SRC;
           next.gimageImageField = field;
           addImageFrame(next);
         }

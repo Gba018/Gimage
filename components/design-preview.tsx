@@ -18,7 +18,7 @@ export function DesignPreview({
   fit = "cover",
   zoom = 1,
 }: {
-  page: PageData;
+  page?: PageData | null;
   width: number;
   height: number;
   className?: string;
@@ -27,20 +27,21 @@ export function DesignPreview({
   fit?: "cover" | "contain";
   zoom?: number;
 }) {
-  const cached = cache.get(page)?.get(maxSize) ?? null;
+  const cached = page ? cache.get(page)?.get(maxSize) ?? null : null;
   const [rendered, setRendered] = useState<{ page: PageData; size: number; src: string } | null>(null);
   const src = cached ?? (rendered && rendered.page === page && rendered.size === maxSize ? rendered.src : null);
   useEffect(() => {
-    if (cache.get(page)?.has(maxSize)) return;
+    const currentPage = page;
+    if (!currentPage || cache.get(currentPage)?.has(maxSize)) return;
     let cancelled = false;
     queue = queue.then(async () => {
       if (cancelled) return;
       try {
         const { renderThumbnail } = await import("@/components/editor/fabric-setup");
-        const url = await renderThumbnail(page, width, height, maxSize);
-        if (!cache.has(page)) cache.set(page, new Map());
-        cache.get(page)!.set(maxSize, url);
-        if (!cancelled) setRendered({ page, size: maxSize, src: url });
+        const url = await renderThumbnail(currentPage, width, height, maxSize);
+        if (!cache.has(currentPage)) cache.set(currentPage, new Map());
+        cache.get(currentPage)!.set(maxSize, url);
+        if (!cancelled) setRendered({ page: currentPage, size: maxSize, src: url });
       } catch (err) {
         console.warn("Preview failed", err);
       }
@@ -52,7 +53,7 @@ export function DesignPreview({
   return (
     <div className={`relative flex min-h-0 items-center justify-center overflow-auto bg-ink-100 ${className}`} style={{ aspectRatio: `${width} / ${height}` }}>
       {src ? (
-        <div className="relative shrink-0" style={{ width: `${Math.max(1, zoom) * 100}%`, aspectRatio: `${width} / ${height}` }}>
+      <div className="relative shrink-0" style={{ width: `${Math.max(1, zoom) * 100}%`, aspectRatio: `${width} / ${height}` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- data URL rendered client-side */}
           <img src={src} alt={alt} className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`} draggable={false} />
         </div>
