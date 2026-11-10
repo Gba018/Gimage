@@ -69,7 +69,9 @@ async function fitDynamicImage(object: SerializedObject): Promise<SerializedObje
   canvas.height = frameHeight;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Could not prepare the dynamic image frame.");
-  const scale = Math.max(frameWidth / sourceWidth, frameHeight / sourceHeight);
+  // Keep the complete source image visible; do not crop the sides when its
+  // aspect ratio differs from the dynamic frame.
+  const scale = Math.min(frameWidth / sourceWidth, frameHeight / sourceHeight);
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
   context.drawImage(image, (frameWidth - drawWidth) / 2, (frameHeight - drawHeight) / 2, drawWidth, drawHeight);
