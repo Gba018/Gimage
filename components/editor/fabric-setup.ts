@@ -86,6 +86,11 @@ async function fitDynamicImage(object: SerializedObject): Promise<SerializedObje
 }
 
 function fitTextObject(text: IText, source: SerializedObject): void {
+  if (source.gimageTextOverflow === "clip" && typeof source.gimageTextMaxHeight === "number") {
+    text.set("clipPath", new Rect({ left: 0, top: 0, width: text.width, height: Math.max(1, source.gimageTextMaxHeight), originX: "center", originY: "center", fill: "#ffffff" }));
+    text.setCoords();
+    return;
+  }
   if (source.gimageTextOverflow !== "fit" || typeof source.gimageTextMaxHeight !== "number") return;
   const minFontSize = typeof source.gimageTextMinFontSize === "number" ? Math.max(4, source.gimageTextMinFontSize) : 12;
   const maxHeight = Math.max(1, source.gimageTextMaxHeight);
