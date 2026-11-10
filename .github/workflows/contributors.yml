@@ -1,0 +1,90 @@
+name: Credit contributors
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: credit-contributors-${{ github.event.pull_request.user.login }}
+  cancel-in-progress: false
+
+jobs:
+  credit:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Add merged pull request author to README
+        id: contributor
+        env:
+          CONTRIBUTOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import html
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          login = os.environ["CONTRIBUTOR_LOGIN"]
+          if login.endswith("[bot]") or not re.fullmatch(r"[A-Za-z0-9-]+", login):
+              raise SystemExit(0)
+
+          readme = Path("README.md")
+          content = readme.read_text()
+          start = "<!-- contributors:start -->"
+          end = "<!-- contributors:end -->"
+          if content.count(start) != 1 or content.count(end) != 1:
+              raise SystemExit("Contributor markers are missing or duplicated")
+          before, tail = content.split(start, 1)
+          section, after = tail.split(end, 1)
+          if re.search(r"\(@" + re.escape(login) + r"\)", section, re.IGNORECASE):
+              raise SystemExit(0)
+
+          request = urllib.request.Request(
+              f"https://api.github.com/users/{login}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "User-Agent": "lumio-contributors-workflow",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              user = json.load(response)
+          name = html.escape(user.get("name") or login)
+          profile = f"https://github.com/{login}"
+          entry = (
+              f'- <a href="{profile}"><img src="{profile}.png?size=32" '
+              f'width="32" height="32" alt="" /></a> '
+              f'<a href="{profile}">{name}</a> (@{login})'
+          )
+          readme.write_text(before + start + section.rstrip("\n") + "\n" + entry + "\n" + end + after)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"login={login.lower()}\nchanged=true\n")
+          PY
+
+      - name: Open contributor credit pull request
+        if: steps.contributor.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ github.token }}
+          base: main
+          branch: automation/credit-${{ steps.contributor.outputs.login }}
+          add-paths: README.md
+          commit-message: 'docs: credit @${{ steps.contributor.outputs.login }}'
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          title: 'docs: credit @${{ steps.contributor.outputs.login }}'
+          body: |
+            Credit @${{ steps.contributor.outputs.login }} for merged pull request #${{ github.event.pull_request.number }}.
+
+            This pull request only updates the contributor section in README.md.
+            Please review and merge it through the normal branch protection rules.

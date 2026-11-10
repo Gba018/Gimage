@@ -1,0 +1,24 @@
+// Fonts available to designs. Loaded via @font-face; files download only when used.
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/400-italic.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/inter/700-italic.css";
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/400-italic.css";
+import "@fontsource/poppins/700.css";
+import "@fontsource/montserrat/400.css";
+import "@fontsource/montserrat/400-italic.css";
+import "@fontsource/montserrat/700.css";
+import "@fontsource/space-grotesk/400.css";
+import "@fontsource/space-grotesk/700.css";
+import "@fontsource/oswald/400.css";
+import "@fontsource/oswald/700.css";
+import "@fontsource/bebas-neue/400.css";
+import "@fontsource/playfair-display/400.css";
+import "@fontsource/playfair-display/400-italic.css";
+import "@fontsource/playfair-display/700.css";
+import "@fontsource/roboto-slab/400.css";
+import "@fontsource/roboto-slab/700.css";
+import "@fontsource/lobster/400.css";
+import "@fontsource/dancing-script/400.css";
+import "@fontsource/dancing-script/700.css";
