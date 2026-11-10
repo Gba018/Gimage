@@ -6,6 +6,11 @@ const FIELD = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const IMAGE_FIELD = /^\{\{\s*([^{}]+?)\s*\}\}$/;
 export type CsvData = { headers: string[]; rows: string[][] };
 
+/** Accept both real line breaks and escaped \n sequences coming from Sheets/imports. */
+export function normalizeTemplateText(value: string): string {
+  return value.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\r/g, "\n");
+}
+
 function addImageFrame(obj: SerializedObject): void {
   if (obj.clipPath || typeof obj.width !== "number" || typeof obj.height !== "number") return;
   obj.clipPath = {
@@ -85,7 +90,7 @@ export function fillTemplate(doc: DesignDoc, data: CsvData, rowIndex: number, ma
         next.text = obj.text.replace(FIELD, (_, key: string) => {
           const column = mapping[key.trim()];
           if (!values.has(column)) throw new Error(`Map the field "${key.trim()}" to a CSV column`);
-          return values.get(column)!;
+          return normalizeTemplateText(values.get(column) ?? "");
         });
         // Character positions change after replacement; retain whole-object styling.
         if (next.text !== obj.text) next.styles = {};

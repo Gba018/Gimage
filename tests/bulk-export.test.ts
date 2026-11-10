@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fillTemplate, parseCsv, templateFields } from "@/lib/design/csv";
+import { fillTemplate, normalizeTemplateText, parseCsv, templateFields } from "@/lib/design/csv";
 import { blankDoc } from "@/lib/design/types";
 import { exportCsvTemplates } from "@/components/editor/bulk-export";
 import { renderPage } from "@/components/editor/fabric-setup";
@@ -7,6 +7,10 @@ import { renderPage } from "@/components/editor/fabric-setup";
 vi.mock("@/components/editor/fabric-setup", () => ({ renderPage: vi.fn(async () => "data:image/png;base64,UE5H") }));
 
 describe("bulk generation", () => {
+  it("normalizes escaped line breaks from spreadsheet text", () => {
+    expect(normalizeTemplateText("Título\\n- Línea 1\\n- Línea 2")).toBe("Título\n- Línea 1\n- Línea 2");
+  });
+
   it("renders every row/page with substituted text, reports progress and leaves the source unchanged", async () => {
     const doc = blankDoc(100, 100); doc.pages[0].objects = [{ type: "Text", text: "{{name}}" }];
     const progress = vi.fn();
