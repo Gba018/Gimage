@@ -614,7 +614,7 @@ export function Editor({ design }: { design: EditorDesign }) {
               if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.workspace) engine?.deselect();
             }}
           >
-            <div data-workspace="1" className={`flex min-h-full min-w-full w-max items-center justify-center p-6 sm:p-12 ${bulkPreviewVisible && bulkPreview ? "flex-col gap-4" : ""}`}>
+            <div data-workspace="1" className={`flex min-h-full min-w-full ${bulkPreviewVisible && bulkPreview ? "w-full flex-col gap-4" : "w-max"} items-center justify-center p-6 sm:p-12`}>
               {bulkPreviewVisible && bulkPreview && (
                 <div className="w-[min(90vw,1100px)]">
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} baseScale={editorFitScale} />
