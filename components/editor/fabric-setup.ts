@@ -1,6 +1,6 @@
 "use client";
 
-import { FabricObject, Gradient, Group, InteractiveFabricObject, StaticCanvas, util, type BaseFabricObject, type TFiller } from "fabric";
+import { FabricObject, FabricImage, Gradient, Group, InteractiveFabricObject, Rect, StaticCanvas, util, type BaseFabricObject, type TFiller } from "fabric";
 import { DEFAULT_DYNAMIC_IMAGE_SRC, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { loadFonts } from "@/lib/design/fonts";
 
@@ -115,10 +115,20 @@ export function isCompleteObject(source: SerializedObject, instance: BaseFabricO
 
 /** Previews tolerate broken assets; strict exports refuse incomplete artwork. */
 export async function enlivenSafe(objects: SerializedObject[], strict = false): Promise<FabricObject[]> {
-  const results = await Promise.allSettled(objects.map((o) => util.enlivenObjects<FabricObject>([normalizeDynamicImages(o)])));
+  const normalized = objects.map(normalizeDynamicImages);
+  const results = await Promise.allSettled(normalized.map((o) => util.enlivenObjects<FabricObject>([o])));
   const out: FabricObject[] = [];
   results.forEach((r, i) => {
-    if (r.status === "fulfilled" && r.value.length && (!strict || isCompleteObject(objects[i], r.value[0]))) out.push(...r.value);
+    if (r.status === "fulfilled" && r.value.length && (!strict || isCompleteObject(objects[i], r.value[0]))) {
+      const source = normalized[i];
+      const image = r.value[0];
+      if (image instanceof FabricImage && typeof source.gimageImageField === "string" && typeof source.width === "number" && typeof source.height === "number") {
+        image.set({ width: source.width, height: source.height, scaleX: typeof source.scaleX === "number" ? source.scaleX : 1, scaleY: typeof source.scaleY === "number" ? source.scaleY : 1 });
+        image.set("clipPath", new Rect({ left: 0, top: 0, width: source.width, height: source.height, originX: "center", originY: "center", fill: "#ffffff" }));
+        image.setCoords();
+      }
+      out.push(...r.value);
+    }
     else if (strict) throw new Error(`Could not load "${objects[i]?.name ?? objects[i]?.type ?? "object"}". Restore the missing asset before exporting.`);
     else console.warn("Skipping object that failed to load", objects[i]?.type);
   });

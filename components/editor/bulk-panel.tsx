@@ -8,10 +8,26 @@ import { listDriveSpreadsheets, listSheetTabs, readSheet, type DriveSpreadsheet 
 import { useEditor } from "./editor-context";
 
 type Source = "csv" | "sheets";
+type SheetPrefs = { spreadsheetId: string; sheetName: string; range: string };
+const SHEET_PREFS_KEY = "gimage_bulk_sheet_preferences";
+
+function readSheetPrefs(): SheetPrefs | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(SHEET_PREFS_KEY) ?? "null") as Partial<SheetPrefs> | null;
+    if (!value || typeof value.spreadsheetId !== "string" || typeof value.sheetName !== "string" || typeof value.range !== "string") return null;
+    return value as SheetPrefs;
+  } catch {
+    return null;
+  }
+}
+
+function writeSheetPrefs(value: SheetPrefs): void {
+  try { localStorage.setItem(SHEET_PREFS_KEY, JSON.stringify(value)); } catch { /* Storage may be disabled. */ }
+}
 
 export function BulkPanel() {
   const { engine, state, notify } = useEditor();
-  const [source, setSource] = useState<Source>("csv");
+  const [source, setSource] = useState<Source>("sheets");
   const [data, setData] = useState<CsvData | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [row, setRow] = useState(0);
@@ -26,6 +42,7 @@ export function BulkPanel() {
   const [loadingSheets, setLoadingSheets] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileToken = useRef(0);
+  const restoredSheets = useRef(false);
   useEffect(() => () => { controller.current?.abort(); fileToken.current++; }, []);
 
   const doc = useMemo(() => engine.toDoc(), [engine, state.revision]);
@@ -63,6 +80,40 @@ export function BulkPanel() {
     } finally { setLoadingSheets(false); }
   }
 
+  async function restoreSheets() {
+    if (restoredSheets.current || source !== "sheets") return;
+    restoredSheets.current = true;
+    const prefs = readSheetPrefs();
+    setLoadingSheets(true);
+    setError("");
+    try {
+      const files = await listDriveSpreadsheets();
+      setDriveFiles(files);
+      const file = files.find((item) => item.id === prefs?.spreadsheetId) ?? files[0];
+      if (!file) throw new Error("No se encontraron hojas de cálculo disponibles.");
+      setSpreadsheetId(file.id);
+      const nextTabs = await listSheetTabs(file.id);
+      setTabs(nextTabs);
+      const nextSheet = nextTabs.includes(prefs?.sheetName ?? "") ? prefs!.sheetName : nextTabs[0] ?? "";
+      setSheetName(nextSheet);
+      const nextRange = prefs?.range || "A1:Z1000";
+      setRange(nextRange);
+      if (nextSheet) {
+        setRows(await readSheet(file.id, nextSheet, nextRange));
+        writeSheetPrefs({ spreadsheetId: file.id, sheetName: nextSheet, range: nextRange });
+      }
+    } catch (err) {
+      restoredSheets.current = false;
+      if (/not connected|authorization expired|Conecta Google/i.test(String(err))) {
+        setError("Conecta Google Sheets para cargar automáticamente tu última hoja.");
+      } else setError(err instanceof Error ? err.message : "Could not load Google Sheets");
+    } finally { setLoadingSheets(false); }
+  }
+
+  useEffect(() => {
+    if (source === "sheets" && state.ready) void restoreSheets();
+  }, [source, state.ready]);
+
   async function selectSpreadsheet(id: string) {
     setSpreadsheetId(id); setTabs([]); setSheetName(""); setData(null); setError("");
     if (!id) return;
@@ -75,7 +126,10 @@ export function BulkPanel() {
   async function loadSheet() {
     if (!spreadsheetId || !sheetName) return;
     setLoadingSheets(true); setError("");
-    try { setRows(await readSheet(spreadsheetId, sheetName, range)); }
+    try {
+      setRows(await readSheet(spreadsheetId, sheetName, range));
+      writeSheetPrefs({ spreadsheetId, sheetName, range });
+    }
     catch (err) { setError(err instanceof Error ? err.message : "Could not read Google Sheets"); }
     finally { setLoadingSheets(false); }
   }
