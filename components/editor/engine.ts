@@ -27,6 +27,7 @@ export type SelectionInfo = {
   isText: boolean;
   isImage: boolean;
   isLine: boolean;
+  imageField: string;
   fill: string | null;
   stroke: string | null;
   strokeWidth: number;
@@ -206,6 +207,7 @@ export class EditorEngine {
       isMulti,
       isText,
       isImage: !isMulti && active instanceof FabricImage,
+      imageField: !isMulti && active instanceof FabricImage ? active.gimageImageField ?? "" : "",
       isLine: !isMulti && typeOf(active) === "line",
       fill: solidColor(leaf?.fill),
       stroke: solidColor(leaf?.stroke),
@@ -932,6 +934,16 @@ export class EditorEngine {
     }
     active.initDimensions();
     active.setCoords();
+    this.canvas.requestRenderAll();
+    this.commit();
+  }
+
+  setSelectedImageField(value: string): void {
+    const active = this.canvas.getActiveObject();
+    if (!(active instanceof FabricImage) || active.locked) return;
+    const field = value.trim().replace(/^\{\{\s*|\s*\}\}$/g, "");
+    if (field && !/^[a-zA-Z0-9_.-]+$/.test(field)) return;
+    active.set("gimageImageField", field || null);
     this.canvas.requestRenderAll();
     this.commit();
   }

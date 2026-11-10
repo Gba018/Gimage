@@ -179,6 +179,18 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
               {photoError && <p role="alert" className="text-xs text-danger-600">{photoError}</p>}
             </div>
           </Popover>}
+          {sel.isImage && (
+            <label className="ml-1 flex shrink-0 items-center gap-1 text-xs text-ink-600" title="Google Sheets image column">
+              <span className="hidden lg:inline">Image field</span>
+              <input
+                aria-label="Image field"
+                value={sel.imageField}
+                onChange={(e) => engine.setSelectedImageField(e.target.value)}
+                placeholder="{{image_url}}"
+                className="h-8 w-32 rounded-md border border-ink-200 bg-white px-2 text-xs"
+              />
+            </label>
+          )}
           {text && (
             <>
               <IconButton label="Bold" active={text.fontWeight === "bold" || Number(text.fontWeight) >= 600} onClick={() => engine.updateText({ fontWeight: text.fontWeight === "bold" || Number(text.fontWeight) >= 600 ? "normal" : "bold" })}>

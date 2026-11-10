@@ -61,9 +61,10 @@ export const ALLOWED_OBJECT_TYPES = new Set([
 ]);
 
 const SAFE_IMAGE_SRC = /^(\/api\/uploads\/[A-Za-z0-9_-]{8,64}|data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+)$/;
+const IMAGE_FIELD_SRC = /^\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}$/;
 
 export function isSafeImageSrc(src: unknown): boolean {
-  return typeof src === "string" && SAFE_IMAGE_SRC.test(src);
+  return typeof src === "string" && (SAFE_IMAGE_SRC.test(src) || IMAGE_FIELD_SRC.test(src));
 }
 
 /**

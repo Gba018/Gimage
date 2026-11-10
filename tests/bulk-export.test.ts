@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseCsv } from "@/lib/design/csv";
+import { fillTemplate, parseCsv, templateFields } from "@/lib/design/csv";
 import { blankDoc } from "@/lib/design/types";
 import { exportCsvTemplates } from "@/components/editor/bulk-export";
 import { renderPage } from "@/components/editor/fabric-setup";
@@ -15,6 +15,14 @@ describe("bulk generation", () => {
     expect(vi.mocked(renderPage).mock.calls.slice(-2).map((args) => args[0].objects[0].text)).toEqual(["Ada", "Grace"]);
     expect(progress).toHaveBeenLastCalledWith(2, 2);
     expect(doc.pages[0].objects[0].text).toBe("{{name}}");
+  });
+  it("substitutes image placeholders from a mapped column without changing the source", () => {
+    const doc = blankDoc(100, 100);
+    doc.pages[0].objects = [{ type: "Image", src: "/api/uploads/abcdefgh12345678", gimageImageField: "image_url" }];
+    const data = parseCsv("image_url\nhttps://images.example/ada.png");
+    expect(templateFields(doc)).toEqual(["image_url"]);
+    expect(fillTemplate(doc, data, 0, { image_url: "image_url" }).pages[0].objects[0].src).toBe("https://images.example/ada.png");
+    expect(doc.pages[0].objects[0].src).toBe("/api/uploads/abcdefgh12345678");
   });
   it("honors cancellation between pages and does not return a partial archive", async () => {
     const abort = new AbortController();

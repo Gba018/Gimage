@@ -9,6 +9,7 @@ declare module "fabric" {
     id?: string;
     name?: string;
     locked?: boolean;
+    gimageImageField?: string | null;
   }
 }
 
@@ -31,7 +32,23 @@ export function configureFabric(): void {
   });
 }
 
-export const SERIALIZE_PROPS = ["id", "name", "locked"];
+export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField"];
+const IMAGE_FIELD_SRC = /^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/;
+const DYNAMIC_IMAGE_PLACEHOLDER = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+function normalizeDynamicImages(object: SerializedObject): SerializedObject {
+  const next = { ...object };
+  if (String(next.type).toLowerCase() === "image" && typeof next.src === "string") {
+    const match = next.src.trim().match(IMAGE_FIELD_SRC);
+    if (match) {
+      next.gimageImageField = typeof next.gimageImageField === "string" && next.gimageImageField ? next.gimageImageField : match[1];
+      next.src = DYNAMIC_IMAGE_PLACEHOLDER;
+    }
+  }
+  if (Array.isArray(next.objects)) next.objects = next.objects.map((child) => normalizeDynamicImages(child as SerializedObject));
+  if (next.clipPath && typeof next.clipPath === "object" && !Array.isArray(next.clipPath)) next.clipPath = normalizeDynamicImages(next.clipPath as SerializedObject);
+  return next;
+}
 
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -99,7 +116,7 @@ export function isCompleteObject(source: SerializedObject, instance: BaseFabricO
 
 /** Previews tolerate broken assets; strict exports refuse incomplete artwork. */
 export async function enlivenSafe(objects: SerializedObject[], strict = false): Promise<FabricObject[]> {
-  const results = await Promise.allSettled(objects.map((o) => util.enlivenObjects<FabricObject>([o])));
+  const results = await Promise.allSettled(objects.map((o) => util.enlivenObjects<FabricObject>([normalizeDynamicImages(o)])));
   const out: FabricObject[] = [];
   results.forEach((r, i) => {
     if (r.status === "fulfilled" && r.value.length && (!strict || isCompleteObject(objects[i], r.value[0]))) out.push(...r.value);

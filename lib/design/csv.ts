@@ -3,6 +3,7 @@ import type { DesignDoc, SerializedObject } from "./types";
 export const MAX_CSV_ROWS = 500;
 export const MAX_CSV_BYTES = 2 * 1024 * 1024;
 const FIELD = /\{\{\s*([^{}]+?)\s*\}\}/g;
+const IMAGE_FIELD = /^\{\{\s*([^{}]+?)\s*\}\}$/;
 export type CsvData = { headers: string[]; rows: string[][] };
 
 /** RFC 4180 fields, including escaped quotes, embedded newlines and UTF-8 BOM. */
@@ -44,6 +45,13 @@ export function templateFields(doc: DesignDoc): string[] {
   function visit(objects: SerializedObject[]) {
     for (const obj of objects) {
       if (typeof obj.text === "string") for (const match of obj.text.matchAll(FIELD)) fields.add(match[1].trim());
+      if (String(obj.type).toLowerCase() === "image") {
+        const stored = typeof obj.gimageImageField === "string" ? obj.gimageImageField.trim() : "";
+        const source = typeof obj.src === "string" ? obj.src.trim() : "";
+        const match = stored ? null : source.match(IMAGE_FIELD);
+        const field = stored || match?.[1]?.trim() || "";
+        if (field) fields.add(field);
+      }
       if (Array.isArray(obj.objects)) visit(obj.objects as SerializedObject[]);
     }
   }
@@ -67,6 +75,19 @@ export function fillTemplate(doc: DesignDoc, data: CsvData, rowIndex: number, ma
         });
         // Character positions change after replacement; retain whole-object styling.
         if (next.text !== obj.text) next.styles = {};
+      }
+      if (String(obj.type).toLowerCase() === "image") {
+        const stored = typeof obj.gimageImageField === "string" ? obj.gimageImageField.trim() : "";
+        const source = typeof obj.src === "string" ? obj.src.trim() : "";
+        const field = stored || source.match(IMAGE_FIELD)?.[1]?.trim() || "";
+        if (field) {
+          const column = mapping[field];
+          if (!values.has(column)) throw new Error(`Map the image field "${field}" to a CSV column`);
+          const value = values.get(column) ?? "";
+          if (!value) throw new Error(`Image field "${field}" is empty`);
+          next.src = value;
+          next.gimageImageField = field;
+        }
       }
       if (Array.isArray(obj.objects)) next.objects = visit(obj.objects as SerializedObject[]);
       return next;
