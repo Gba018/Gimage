@@ -180,8 +180,20 @@ export async function migrate(pool: Pool): Promise<void> {
 }
 
 export function createPool(connectionString: string, options: { schema?: string } = {}): Pool {
+  const isSupabase = (() => {
+    try {
+      const hostname = new URL(connectionString).hostname;
+      return hostname.endsWith(".supabase.co") || hostname.endsWith(".pooler.supabase.com");
+    } catch {
+      return false;
+    }
+  })();
+
   return new Pool({
     connectionString,
+    // Supabase requires TLS for both direct and pooler connections. Keep local
+    // PostgreSQL development connections unchanged.
+    ...(isSupabase ? { ssl: { rejectUnauthorized: false } } : {}),
     max: Number(process.env.DATABASE_POOL_MAX) || 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
