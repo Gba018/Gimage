@@ -243,7 +243,18 @@ export class EditorEngine {
     c.on("selection:updated", () => this.emit());
     c.on("selection:cleared", () => this.emit());
     c.on("object:moving", (e) => this.snap(e.target));
-    c.on("object:scaling", () => this.emit());
+    c.on("object:scaling", ({ target }) => {
+      if (target instanceof IText && !target.locked) {
+        const scaleX = target.scaleX || 1;
+        if (Math.abs(scaleX - 1) > 0.001 || Math.abs((target.scaleY || 1) - 1) > 0.001) {
+          target.set({ width: Math.max(20, target.width * scaleX), scaleX: 1, scaleY: 1 });
+          target.initDimensions();
+          target.setCoords();
+          c.requestRenderAll();
+        }
+      }
+      this.emit();
+    });
     c.on("mouse:up", () => {
       this.snapCache = null;
       if (this.guides.length) {
