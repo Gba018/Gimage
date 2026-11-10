@@ -489,13 +489,7 @@ export function Editor({ design }: { design: EditorDesign }) {
           <IconButton label="Keyboard shortcuts (?)" className="hidden text-white hover:bg-white/15 sm:inline-flex" onClick={() => setDialog("shortcuts")}>
             <Keyboard size={17} />
           </IconButton>
-          <IconButton label={bulkPreview ? (bulkPreviewVisible ? "Hide bulk preview" : "Show bulk preview") : "Open Bulk create"} className="text-white hover:bg-white/15" onClick={() => {
-            if (!bulkPreview) {
-              setPanel("bulk");
-              return;
-            }
-            setBulkPreviewVisible((visible) => !visible);
-          }}>
+          <IconButton label={bulkPreview ? (bulkPreviewVisible ? "Hide bulk preview" : "Show bulk preview") : "Bulk preview unavailable"} className="text-white hover:bg-white/15 disabled:text-white/40" disabled={!bulkPreview} onClick={() => setBulkPreviewVisible((visible) => !visible)}>
             {bulkPreviewVisible ? <EyeOff size={17} /> : <Eye size={17} />}
           </IconButton>
           <Button size="sm" variant="glass" className="ml-1" onClick={() => setDialog("share")} disabled={!engine}>
@@ -545,8 +539,7 @@ export function Editor({ design }: { design: EditorDesign }) {
         </nav>
 
         {/* Side panel */}
-        {(panel || bulkPreview) && (
-          <aside className={`relative max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-ink-200 bg-white p-4 md:max-h-none md:w-[320px] md:border-r md:border-t-0 ${panel ? "" : "hidden"}`} aria-label={`${PANELS.find((p) => p.id === panel)?.label ?? "Bulk create"} panel`}>
+        <aside className={`relative max-h-[42vh] w-full shrink-0 overflow-y-auto border-t border-ink-200 bg-white p-4 md:max-h-none md:w-[320px] md:border-r md:border-t-0 ${panel ? "" : "hidden"}`} aria-label={`${PANELS.find((p) => p.id === panel)?.label ?? "Bulk create"} panel`}>
             {panel && <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold text-ink-900">{PANELS.find((p) => p.id === panel)?.label}</h2>
               <IconButton label="Close panel" onClick={() => setPanel(null)}>
@@ -574,7 +567,6 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </aside>
-        )}
 
         {/* Workspace */}
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
