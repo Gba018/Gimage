@@ -49,6 +49,37 @@ function normalizeDynamicImages(object: SerializedObject): SerializedObject {
   return next;
 }
 
+async function fitDynamicImage(object: SerializedObject): Promise<SerializedObject> {
+  const next = { ...object };
+  if (String(next.type).toLowerCase() !== "image" || typeof next.gimageImageField !== "string" || typeof next.src !== "string" || typeof next.width !== "number" || typeof next.height !== "number") return next;
+  const image = new window.Image();
+  image.crossOrigin = "anonymous";
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error(`Could not load dynamic image "${next.gimageImageField}".`));
+    image.src = next.src as string;
+  });
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  if (!sourceWidth || !sourceHeight) throw new Error(`Dynamic image "${next.gimageImageField}" has no dimensions.`);
+  const frameWidth = Math.max(1, Math.round(next.width));
+  const frameHeight = Math.max(1, Math.round(next.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = frameWidth;
+  canvas.height = frameHeight;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not prepare the dynamic image frame.");
+  const scale = Math.max(frameWidth / sourceWidth, frameHeight / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  context.drawImage(image, (frameWidth - drawWidth) / 2, (frameHeight - drawHeight) / 2, drawWidth, drawHeight);
+  next.src = canvas.toDataURL("image/png");
+  next.width = frameWidth;
+  next.height = frameHeight;
+  next.clipPath = undefined;
+  return next;
+}
+
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 }
@@ -114,20 +145,23 @@ export function isCompleteObject(source: SerializedObject, instance: BaseFabricO
 }
 
 /** Previews tolerate broken assets; strict exports refuse incomplete artwork. */
-export async function enlivenSafe(objects: SerializedObject[], strict = false): Promise<FabricObject[]> {
-  const normalized = objects.map(normalizeDynamicImages);
-  const results = await Promise.allSettled(normalized.map((o) => util.enlivenObjects<FabricObject>([o])));
+export async function enlivenSafe(objects: SerializedObject[], strict = false, fitDynamicImages = false): Promise<FabricObject[]> {
+  const results = await Promise.allSettled(objects.map(async (object) => {
+    const normalized = normalizeDynamicImages(object);
+    const prepared = fitDynamicImages ? await fitDynamicImage(normalized) : normalized;
+    return { source: prepared, value: await util.enlivenObjects<FabricObject>([prepared]) };
+  }));
   const out: FabricObject[] = [];
   results.forEach((r, i) => {
-    if (r.status === "fulfilled" && r.value.length && (!strict || isCompleteObject(objects[i], r.value[0]))) {
-      const source = normalized[i];
-      const image = r.value[0];
+    if (r.status === "fulfilled" && r.value.value.length && (!strict || isCompleteObject(r.value.source, r.value.value[0]))) {
+      const source = r.value.source;
+      const image = r.value.value[0];
       if (image instanceof FabricImage && typeof source.gimageImageField === "string" && typeof source.width === "number" && typeof source.height === "number") {
         image.set({ width: source.width, height: source.height, scaleX: typeof source.scaleX === "number" ? source.scaleX : 1, scaleY: typeof source.scaleY === "number" ? source.scaleY : 1 });
         image.set("clipPath", new Rect({ left: 0, top: 0, width: source.width, height: source.height, originX: "center", originY: "center", fill: "#ffffff" }));
         image.setCoords();
       }
-      out.push(...r.value);
+      out.push(...r.value.value);
     }
     else if (strict) throw new Error(`Could not load "${objects[i]?.name ?? objects[i]?.type ?? "object"}". Restore the missing asset before exporting.`);
     else console.warn("Skipping object that failed to load", objects[i]?.type);
@@ -147,7 +181,7 @@ export async function renderPage(
   const el = document.createElement("canvas");
   const sc = new StaticCanvas(el, { width, height, enableRetinaScaling: false, renderOnAddRemove: false });
   try {
-    const objects = await enlivenSafe(page.objects, options.strict);
+    const objects = await enlivenSafe(page.objects, options.strict, true);
     sc.add(...objects);
     if (!options.transparent) sc.backgroundColor = backgroundFill(page.background, width, height);
     else if (options.format === "jpeg") sc.backgroundColor = "#ffffff";
