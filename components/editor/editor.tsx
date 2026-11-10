@@ -489,12 +489,15 @@ export function Editor({ design }: { design: EditorDesign }) {
           <IconButton label="Keyboard shortcuts (?)" className="hidden text-white hover:bg-white/15 sm:inline-flex" onClick={() => setDialog("shortcuts")}>
             <Keyboard size={17} />
           </IconButton>
-          {bulkPreview && <IconButton label={bulkPreviewVisible ? "Hide bulk preview" : "Show bulk preview"} className="text-white hover:bg-white/15" onClick={() => setBulkPreviewVisible((visible) => !visible)}>
+          <IconButton label={bulkPreview ? (bulkPreviewVisible ? "Hide bulk preview" : "Show bulk preview") : "Open Bulk create"} className="text-white hover:bg-white/15" onClick={() => {
+            if (!bulkPreview) {
+              setPanel("bulk");
+              return;
+            }
+            setBulkPreviewVisible((visible) => !visible);
+          }}>
             {bulkPreviewVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-          </IconButton>}
-          {bulkPreview && <IconButton label={bulkRibbonVisible ? "Hide preview ribbon" : "Show preview ribbon"} className="text-white hover:bg-white/15" onClick={() => setBulkRibbonVisible((visible) => !visible)}>
-            {bulkRibbonVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-          </IconButton>}
+          </IconButton>
           <Button size="sm" variant="glass" className="ml-1" onClick={() => setDialog("share")} disabled={!engine}>
             <Share2 size={15} /> <span className="hidden sm:inline">Share</span>
           </Button>
@@ -651,14 +654,20 @@ export function Editor({ design }: { design: EditorDesign }) {
             )}
           </div>
           {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
-            <div className="mx-auto flex w-[min(90vw,1100px)] gap-2 overflow-x-auto rounded-lg bg-white p-2">
+            <div className="mx-auto flex w-[min(90vw,1100px)] items-start gap-2">
+              <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto rounded-lg bg-white p-2">
               {bulkPreview.rowPreviews.map(({ index, page }) => (
                 <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
                   <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
                   <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
                 </button>
               ))}
+              </div>
+              <button type="button" className="shrink-0 rounded-md border border-ink-200 bg-white px-2 py-2 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(false)} aria-label="Hide preview ribbon">Hide ribbon</button>
             </div>
+          </div>}
+          {bulkPreviewVisible && bulkPreview && !bulkRibbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
+            <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(true)} aria-label="Show preview ribbon">Show preview ribbon</button>
           </div>}
           {bulkPreviewVisible && bulkPreview ? null : ctx && (
             <EditorContext value={ctx}>
