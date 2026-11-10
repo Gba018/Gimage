@@ -46,7 +46,6 @@ import { uploadImage } from "./uploads";
 import { text as textBuilder } from "@/lib/design/builders";
 import { BulkPreviewCanvas } from "./bulk-preview-canvas";
 import type { BulkPreviewState } from "./bulk-panel";
-import { DesignPreview } from "@/components/design-preview";
 
 export type EditorDesign = { id: string; title: string; doc: DesignDoc; shareToken: string | null; revision: number };
 
@@ -608,12 +607,6 @@ export function Editor({ design }: { design: EditorDesign }) {
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex === 0} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex - 1)}>‹ Page</button>
                     <span className="min-w-20 text-center">Page {bulkPreview.pageIndex + 1} / {bulkPreview.pages.length}</span>
                     <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.pageIndex >= bulkPreview.pages.length - 1} onClick={() => bulkPreview.setPage(bulkPreview.pageIndex + 1)}>Page ›</button>
-                    <span className="mx-1 h-5 w-px bg-ink-200" />
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom <= 1} onClick={() => bulkPreview.setZoom(bulkPreview.zoom - 0.1)} aria-label="Zoom out">−</button>
-                    <input aria-label="Preview zoom" type="range" min={1} max={3} step={0.1} value={bulkPreview.zoom} onChange={(e) => bulkPreview.setZoom(Number(e.target.value))} className="w-40 accent-brand-600" />
-                    <span className="w-12 text-center tabular-nums">{Math.round(bulkPreview.zoom * 100)}%</span>
-                    <button type="button" className="rounded px-2 py-1 hover:bg-ink-100 disabled:opacity-40" disabled={bulkPreview.zoom >= 3} onClick={() => bulkPreview.setZoom(bulkPreview.zoom + 0.1)} aria-label="Zoom in">+</button>
-                    <button type="button" className="rounded bg-ink-100 px-2 py-1 hover:bg-ink-200" onClick={() => bulkPreview.setZoom(1)} title="Mostrar el diseño completo ajustado al área visible">100% · Ajustar</button>
                   </div>
                   <BulkPreviewCanvas page={bulkPreview.page} width={bulkPreview.width} height={bulkPreview.height} zoom={bulkPreview.zoom} />
                 </div>
@@ -645,26 +638,15 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
-          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && <div className="z-20 shrink-0 border-t border-ink-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
-            <div className="mx-auto w-[min(90vw,1100px)]">
-              <div className="flex h-8 items-center justify-between border-b border-ink-100 px-1">
-                <span className="text-[11px] font-medium text-ink-500">Bulk rows</span>
-                <button type="button" className="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(false)} aria-label="Hide preview ribbon">Hide ribbon</button>
-              </div>
-              <div className="flex min-w-0 gap-2 overflow-x-auto rounded-lg bg-white p-2">
-                {bulkPreview.rowPreviews.map(({ index, page }) => (
-                  <button key={index} type="button" aria-label={`Preview row ${index + 1}`} aria-pressed={index === bulkPreview.row} onClick={() => bulkPreview.setRow(index)} className={`w-24 shrink-0 rounded-md p-1 ${index === bulkPreview.row ? "bg-brand-100 ring-2 ring-brand-500" : "bg-ink-50 ring-1 ring-ink-200"}`}>
-                    <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="rounded" />
-                    <span className="block py-1 text-center text-[10px]">Row {index + 1}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>}
+          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && ctx && (
+            <EditorContext value={ctx}>
+              <PageStrip bulkPreview={bulkPreview} onHideBulkRibbon={() => setBulkRibbonVisible(false)} onFit={() => bulkPreview.setZoom(1)} onManualZoom={() => undefined} />
+            </EditorContext>
+          )}
           {bulkPreviewVisible && bulkPreview && !bulkRibbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
             <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(true)} aria-label="Show preview ribbon">Show preview ribbon</button>
           </div>}
-          {bulkPreviewVisible && bulkPreview ? null : ctx && (
+          {!bulkPreviewVisible && ctx && (
             <EditorContext value={ctx}>
               <PageStrip onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />
             </EditorContext>

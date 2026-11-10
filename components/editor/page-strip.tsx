@@ -1,12 +1,54 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Copy, Maximize, Minus, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, Maximize, Minus, Plus, Trash2 } from "lucide-react";
 import { DesignPreview } from "@/components/design-preview";
 import { IconButton } from "@/components/ui/button";
 import { useEditor } from "./editor-context";
+import type { BulkPreviewState } from "./bulk-panel";
 
-export function PageStrip({ onFit, onManualZoom }: { onFit: () => void; onManualZoom: () => void }) {
+export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }: { onFit: () => void; onManualZoom: () => void; bulkPreview?: BulkPreviewState; onHideBulkRibbon?: () => void }) {
   const { engine, state } = useEditor();
+  if (bulkPreview) {
+    const steps = [1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+    const stepBulkZoom = (dir: 1 | -1) => {
+      const z = bulkPreview.zoom;
+      const next = dir > 0 ? steps.find((s) => s > z + 0.001) : [...steps].reverse().find((s) => s < z - 0.001);
+      bulkPreview.setZoom(next ?? z);
+    };
+    return (
+      <div className="flex h-24 shrink-0 items-center gap-3 border-t border-ink-200 bg-white px-3">
+        <ol className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-2" aria-label="Bulk rows">
+          {onHideBulkRibbon && <li className="shrink-0">
+            <IconButton label="Hide preview ribbon" onClick={onHideBulkRibbon}>
+              <ChevronDown size={17} />
+            </IconButton>
+          </li>}
+          {bulkPreview.rowPreviews.map(({ index, page }) => (
+            <li key={index} className="shrink-0">
+              <button type="button" onClick={() => bulkPreview.setRow(index)} aria-current={index === bulkPreview.row ? "page" : undefined} aria-label={`Row ${index + 1}`} className={`block h-14 overflow-hidden rounded-md ring-2 ${index === bulkPreview.row ? "ring-brand-600" : "ring-transparent hover:ring-ink-300"}`}>
+                <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="h-14" />
+              </button>
+              <span className="block text-center text-[10px] text-ink-600">{index + 1}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="flex shrink-0 items-center gap-1">
+          <IconButton label="Zoom out" onClick={() => stepBulkZoom(-1)} disabled={bulkPreview.zoom <= 1}>
+            <Minus size={15} />
+          </IconButton>
+          <input type="range" aria-label="Bulk preview zoom" min={100} max={300} value={Math.round(bulkPreview.zoom * 100)} onChange={(e) => bulkPreview.setZoom(Number(e.target.value) / 100)} className="hidden w-28 accent-brand-600 md:block" />
+          <IconButton label="Zoom in" onClick={() => stepBulkZoom(1)} disabled={bulkPreview.zoom >= 3}>
+            <Plus size={15} />
+          </IconButton>
+          <span className="w-12 text-center text-xs tabular-nums text-ink-700">{Math.round(bulkPreview.zoom * 100)}%</span>
+          <IconButton label="Fit bulk preview to screen" onClick={() => bulkPreview.setZoom(1)}>
+            <Maximize size={15} />
+          </IconButton>
+        </div>
+      </div>
+    );
+  }
+
   const zoomPct = Math.round(state.zoom * 100);
   const steps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
   const stepZoom = (dir: 1 | -1) => {
