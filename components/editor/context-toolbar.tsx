@@ -218,6 +218,26 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
                   <Slider label="Line height" value={text.lineHeight} min={0.6} max={3} step={0.05} onChange={(v) => engine.updateText({ lineHeight: v })} format={(v) => v.toFixed(2)} />
                 </div>
               </Popover>
+              <Popover label="Text layout" trigger={({ toggle, open }) => (
+                <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">Text layout</button>
+              )}>
+                <div className="w-64 space-y-3 text-sm text-ink-700">
+                  <label className="block text-xs font-medium">Overflow mode
+                    <select aria-label="Text overflow mode" value={text.overflow} onChange={(e) => engine.setTextLayout({ overflow: e.target.value as "fit" | "clip" | "allow" })} className="mt-1 h-8 w-full rounded-md border border-ink-200 bg-white px-2">
+                      <option value="fit">Auto-fit text</option>
+                      <option value="clip">Clip overflowing text</option>
+                      <option value="allow">Allow overflow</option>
+                    </select>
+                  </label>
+                  <label className="block text-xs font-medium">Maximum height (px)
+                    <input aria-label="Text maximum height" type="number" min={16} step={1} value={Math.round(text.maxHeight)} onChange={(e) => engine.setTextLayout({ maxHeight: Number(e.target.value) })} className="mt-1 h-8 w-full rounded-md border border-ink-200 px-2" />
+                  </label>
+                  <label className="block text-xs font-medium">Minimum font size (px)
+                    <input aria-label="Text minimum font size" type="number" min={4} step={1} value={Math.round(text.minFontSize)} onChange={(e) => engine.setTextLayout({ minFontSize: Number(e.target.value) })} className="mt-1 h-8 w-full rounded-md border border-ink-200 px-2" />
+                  </label>
+                  <p className="text-xs text-ink-500">Auto-fit changes the font size, never the letter proportions.</p>
+                </div>
+              </Popover>
             </>
           )}
           {!text && !sel.isMulti && (

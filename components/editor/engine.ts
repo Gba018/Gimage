@@ -16,6 +16,9 @@ export type TextProps = {
   textAlign: string;
   lineHeight: number;
   charSpacing: number;
+  overflow: "fit" | "clip" | "allow";
+  maxHeight: number;
+  minFontSize: number;
 };
 
 export type SelectionInfo = {
@@ -226,6 +229,9 @@ export class EditorEngine {
             textAlign: (active as IText).textAlign,
             lineHeight: (active as IText).lineHeight,
             charSpacing: (active as IText).charSpacing,
+            overflow: active.gimageTextOverflow ?? "allow",
+            maxHeight: active.gimageTextMaxHeight ?? active.getScaledHeight(),
+            minFontSize: active.gimageTextMinFontSize ?? 12,
           }
         : null,
       box: { x: box.left, y: box.top, width: box.width, height: box.height, angle: active.angle ?? 0 },
@@ -951,6 +957,16 @@ export class EditorEngine {
     active.initDimensions();
     active.setCoords();
     this.canvas.requestRenderAll();
+    this.commit();
+  }
+
+  setTextLayout(props: Partial<Pick<TextProps, "overflow" | "maxHeight" | "minFontSize">>): void {
+    const active = this.canvas.getActiveObject();
+    if (!(active instanceof IText) || active.locked) return;
+    if (props.overflow !== undefined) active.set("gimageTextOverflow", props.overflow);
+    if (props.maxHeight !== undefined && Number.isFinite(props.maxHeight)) active.set("gimageTextMaxHeight", Math.max(16, Math.round(props.maxHeight)));
+    if (props.minFontSize !== undefined && Number.isFinite(props.minFontSize)) active.set("gimageTextMinFontSize", Math.max(4, Math.round(props.minFontSize)));
+    active.setCoords();
     this.commit();
   }
 

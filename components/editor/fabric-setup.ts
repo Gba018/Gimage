@@ -1,6 +1,6 @@
 "use client";
 
-import { FabricObject, FabricImage, Gradient, Group, InteractiveFabricObject, Rect, StaticCanvas, util, type BaseFabricObject, type TFiller } from "fabric";
+import { FabricObject, FabricImage, Gradient, Group, IText, InteractiveFabricObject, Rect, StaticCanvas, util, type BaseFabricObject, type TFiller } from "fabric";
 import { DEFAULT_DYNAMIC_IMAGE_SRC, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { loadFonts } from "@/lib/design/fonts";
 
@@ -10,6 +10,9 @@ declare module "fabric" {
     name?: string;
     locked?: boolean;
     gimageImageField?: string | null;
+    gimageTextOverflow?: "fit" | "clip" | "allow";
+    gimageTextMaxHeight?: number;
+    gimageTextMinFontSize?: number;
   }
 }
 
@@ -32,7 +35,7 @@ export function configureFabric(): void {
   });
 }
 
-export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField"];
+export const SERIALIZE_PROPS = ["id", "name", "locked", "gimageImageField", "gimageTextOverflow", "gimageTextMaxHeight", "gimageTextMinFontSize"];
 const IMAGE_FIELD_SRC = /^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/;
 
 function normalizeDynamicImages(object: SerializedObject): SerializedObject {
@@ -80,6 +83,17 @@ async function fitDynamicImage(object: SerializedObject): Promise<SerializedObje
   next.height = frameHeight;
   next.clipPath = undefined;
   return next;
+}
+
+function fitTextObject(text: IText, source: SerializedObject): void {
+  if (source.gimageTextOverflow !== "fit" || typeof source.gimageTextMaxHeight !== "number") return;
+  const minFontSize = typeof source.gimageTextMinFontSize === "number" ? Math.max(4, source.gimageTextMinFontSize) : 12;
+  const maxHeight = Math.max(1, source.gimageTextMaxHeight);
+  while (text.getScaledHeight() > maxHeight && text.fontSize > minFontSize) {
+    text.set("fontSize", Math.max(minFontSize, text.fontSize - 1));
+    text.initDimensions();
+  }
+  text.setCoords();
 }
 
 export function uid(): string {
@@ -163,6 +177,7 @@ export async function enlivenSafe(objects: SerializedObject[], strict = false, f
         image.set("clipPath", new Rect({ left: 0, top: 0, width: source.width, height: source.height, originX: "center", originY: "center", fill: "#ffffff" }));
         image.setCoords();
       }
+      if (image instanceof IText) fitTextObject(image, source);
       out.push(...r.value.value);
     }
     else if (strict) throw new Error(`Could not load "${objects[i]?.name ?? objects[i]?.type ?? "object"}". Restore the missing asset before exporting.`);
