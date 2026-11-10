@@ -6,20 +6,25 @@ import { Button, IconButton } from "@/components/ui/button";
 import { useEditor } from "./editor-context";
 import type { BulkPreviewState } from "./bulk-panel";
 
-export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }: { onFit: () => void; onManualZoom: () => void; bulkPreview?: BulkPreviewState; onHideBulkRibbon?: () => void }) {
+export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideRibbon, zoomValue, onZoomChange }: { onFit: () => void; onManualZoom: () => void; bulkPreview?: BulkPreviewState; onHideRibbon?: () => void; zoomValue?: number; onZoomChange?: (zoom: number) => void }) {
   const { engine, state } = useEditor();
+  const applyZoom = (next: number) => {
+    if (onZoomChange) onZoomChange(next);
+    else if (bulkPreview) bulkPreview.setZoom(next);
+    else engine.setZoom(next);
+  };
   if (bulkPreview) {
     const steps = [1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
     const stepBulkZoom = (dir: 1 | -1) => {
-      const z = bulkPreview.zoom;
+      const z = zoomValue ?? bulkPreview.zoom;
       const next = dir > 0 ? steps.find((s) => s > z + 0.001) : [...steps].reverse().find((s) => s < z - 0.001);
-      bulkPreview.setZoom(next ?? z);
+      if (next !== undefined) applyZoom(next);
     };
     return (
       <div className="flex h-24 shrink-0 items-center gap-3 border-t border-ink-200 bg-white px-3">
         <ol className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-2" aria-label="Bulk rows">
-          {onHideBulkRibbon && <li className="shrink-0">
-            <Button size="sm" variant="secondary" className="gap-1" onClick={onHideBulkRibbon} aria-label="Hide preview ribbon">
+          {onHideRibbon && <li className="shrink-0">
+            <Button size="sm" variant="secondary" className="gap-1" onClick={onHideRibbon} aria-label="Hide preview ribbon">
               <ChevronDown size={15} /> Hide
             </Button>
           </li>}
@@ -33,15 +38,15 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }
           ))}
         </ol>
         <div className="flex shrink-0 items-center gap-1">
-          <IconButton label="Zoom out" onClick={() => stepBulkZoom(-1)} disabled={bulkPreview.zoom <= 1}>
+          <IconButton label="Zoom out" onClick={() => stepBulkZoom(-1)} disabled={(zoomValue ?? bulkPreview.zoom) <= 1}>
             <Minus size={15} />
           </IconButton>
-          <input type="range" aria-label="Bulk preview zoom" min={100} max={300} value={Math.round(bulkPreview.zoom * 100)} onChange={(e) => bulkPreview.setZoom(Number(e.target.value) / 100)} className="hidden w-28 accent-brand-600 md:block" />
-          <IconButton label="Zoom in" onClick={() => stepBulkZoom(1)} disabled={bulkPreview.zoom >= 3}>
+          <input type="range" aria-label="Bulk preview zoom" min={100} max={300} value={Math.round((zoomValue ?? bulkPreview.zoom) * 100)} onChange={(e) => applyZoom(Number(e.target.value) / 100)} className="hidden w-28 accent-brand-600 md:block" />
+          <IconButton label="Zoom in" onClick={() => stepBulkZoom(1)} disabled={(zoomValue ?? bulkPreview.zoom) >= 3}>
             <Plus size={15} />
           </IconButton>
-          <span className="w-12 text-center text-xs tabular-nums text-ink-700">{Math.round(bulkPreview.zoom * 100)}%</span>
-          <IconButton label="Fit bulk preview to screen" onClick={() => bulkPreview.setZoom(1)}>
+          <span className="w-12 text-center text-xs tabular-nums text-ink-700">{Math.round((zoomValue ?? bulkPreview.zoom) * 100)}%</span>
+          <IconButton label="Fit bulk preview to screen" onClick={onFit}>
             <Maximize size={15} />
           </IconButton>
         </div>
@@ -49,17 +54,25 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }
     );
   }
 
-  const zoomPct = Math.round(state.zoom * 100);
+  const currentZoom = zoomValue ?? state.zoom;
+  const zoomPct = Math.round(currentZoom * 100);
   const steps = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
   const stepZoom = (dir: 1 | -1) => {
-    const z = state.zoom;
+    const z = currentZoom;
     const next = dir > 0 ? steps.find((s) => s > z + 0.001) : [...steps].reverse().find((s) => s < z - 0.001);
-    onManualZoom();
-    engine.setZoom(next ?? z);
+    if (next !== undefined) {
+      onManualZoom();
+      applyZoom(next);
+    }
   };
   return (
     <div className="flex h-24 shrink-0 items-center gap-3 border-t border-ink-200 bg-white px-3">
       <ol className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-2" aria-label="Pages">
+        {onHideRibbon && <li className="shrink-0">
+          <Button size="sm" variant="secondary" className="gap-1" onClick={onHideRibbon} aria-label="Hide editor ribbon">
+            <ChevronDown size={15} /> Hide
+          </Button>
+        </li>}
         {state.pages.map((p, i) => {
           const active = i === state.activePage;
           return (
@@ -117,7 +130,8 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideBulkRibbon }
           value={Math.min(400, zoomPct)}
           onChange={(e) => {
             onManualZoom();
-            engine.setZoom(Number(e.target.value) / 100);
+            const next = Number(e.target.value) / 100;
+            applyZoom(next);
           }}
           className="hidden w-28 accent-brand-600 md:block"
         />

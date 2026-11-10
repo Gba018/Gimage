@@ -99,13 +99,21 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [participants, setParticipants] = useState<{ id: string; name: string }[]>([]);
   const [bulkPreview, setBulkPreview] = useState<BulkPreviewState | null>(null);
   const [bulkPreviewVisible, setBulkPreviewVisible] = useState(false);
-  const [bulkRibbonVisible, setBulkRibbonVisible] = useState(true);
+  const [ribbonVisible, setRibbonVisible] = useState(true);
+  const [sharedZoom, setSharedZoom] = useState(1);
 
   const handleBulkPreviewChange = useCallback((preview: BulkPreviewState | null) => {
     const wasEmpty = bulkPreview === null;
     setBulkPreview(preview);
     if (preview && wasEmpty) setBulkPreviewVisible(true);
   }, [bulkPreview]);
+
+  const changeSharedZoom = useCallback((zoom: number) => {
+    const next = Math.max(1, Math.min(3, zoom));
+    setSharedZoom(next);
+    if (bulkPreviewVisible && bulkPreview) bulkPreview.setZoom(next);
+    else engine?.setZoom(next);
+  }, [bulkPreview, bulkPreviewVisible, engine]);
 
   const notify = useCallback((message: string, tone: "info" | "error" = "info") => {
     const id = Date.now() + Math.random();
@@ -278,6 +286,16 @@ export function Editor({ design }: { design: EditorDesign }) {
 
   const subscribe = useCallback((cb: () => void) => (engine ? engine.subscribe(cb) : () => undefined), [engine]);
   const state = useSyncExternalStore(subscribe, () => engine?.getState() ?? EMPTY_STATE, () => EMPTY_STATE);
+
+  useEffect(() => {
+    if (!bulkPreviewVisible) setSharedZoom(state.zoom);
+  }, [bulkPreviewVisible, state.zoom]);
+
+  useEffect(() => {
+    if (!bulkPreviewVisible || !bulkPreview) return;
+    const next = Math.max(1, Math.min(3, sharedZoom));
+    if (bulkPreview.zoom !== next) bulkPreview.setZoom(next);
+  }, [bulkPreview, bulkPreviewVisible, sharedZoom]);
 
   // Refit when the design is resized.
   const lastSize = useRef(`${design.doc.width}x${design.doc.height}`);
@@ -638,17 +656,20 @@ export function Editor({ design }: { design: EditorDesign }) {
               </div>
             )}
           </div>
-          {bulkPreviewVisible && bulkPreview && bulkRibbonVisible && ctx && (
+          {bulkPreviewVisible && bulkPreview && ribbonVisible && ctx && (
             <EditorContext value={ctx}>
-              <PageStrip bulkPreview={bulkPreview} onHideBulkRibbon={() => setBulkRibbonVisible(false)} onFit={() => bulkPreview.setZoom(1)} onManualZoom={() => undefined} />
+              <PageStrip bulkPreview={bulkPreview} zoomValue={sharedZoom} onZoomChange={changeSharedZoom} onHideRibbon={() => setRibbonVisible(false)} onFit={() => changeSharedZoom(1)} onManualZoom={() => undefined} />
             </EditorContext>
           )}
-          {bulkPreviewVisible && bulkPreview && !bulkRibbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-[0_-4px_12px_rgba(15,13,26,0.08)]">
-            <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setBulkRibbonVisible(true)} aria-label="Show preview ribbon">Show preview ribbon</button>
+          {bulkPreviewVisible && bulkPreview && !ribbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-sm">
+            <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setRibbonVisible(true)} aria-label="Show preview ribbon">Show preview ribbon</button>
           </div>}
           {!bulkPreviewVisible && ctx && (
             <EditorContext value={ctx}>
-              <PageStrip onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />
+              {ribbonVisible && <PageStrip zoomValue={state.zoom} onZoomChange={changeSharedZoom} onHideRibbon={() => setRibbonVisible(false)} onFit={() => fit()} onManualZoom={() => (autoFit.current = false)} />}
+              {!ribbonVisible && <div className="z-20 flex shrink-0 justify-center border-t border-ink-200 bg-white/95 py-1 shadow-sm">
+                <button type="button" className="rounded-t-md border border-b-0 border-ink-200 bg-white px-4 py-1 text-xs text-ink-700 shadow-sm hover:bg-ink-100" onClick={() => setRibbonVisible(true)} aria-label="Show editor ribbon">Show ribbon</button>
+              </div>}
             </EditorContext>
           )}
         </main>
