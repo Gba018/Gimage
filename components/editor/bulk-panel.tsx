@@ -66,8 +66,9 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
   const fields = useMemo(() => templateFields(doc), [doc]);
   const resolved = useMemo(() => Object.fromEntries(fields.map((field) => [field, Object.hasOwn(mapping, field) ? mapping[field] : (data?.headers.includes(field) ? field : "")])), [fields, mapping, data]);
   const mapped = !!data && fields.length > 0 && fields.every((field) => data.headers.includes(resolved[field]));
-  const preview = useMemo(() => data && mapped ? fillTemplate(doc, data, row, resolved) : null, [data, mapped, doc, row, resolved]);
-  const activePreviewPage = preview ? Math.min(previewPage, Math.max(0, preview.pages.length - 1)) : 0;
+  const previewData = useMemo(() => data && mapped ? fillTemplate(doc, data, row, resolved) : null, [data, mapped, doc, row, resolved]);
+  const preview: typeof previewData = null;
+  const activePreviewPage = previewData ? Math.min(previewPage, Math.max(0, previewData.pages.length - 1)) : 0;
   const selectedCount = selectedRows.size;
   const allSelected = !!data && selectedCount === data.rows.length;
 
@@ -76,13 +77,13 @@ export function BulkPanel({ onPreviewChange }: { onPreviewChange?: (preview: Bul
 
   useEffect(() => {
     if (!onPreviewChange) return;
-    if (!preview || !data) {
+    if (!previewData || !data) {
       onPreviewChange(null);
       return;
     }
-    onPreviewChange({ page: preview.pages[activePreviewPage], pages: preview.pages, width: preview.width, height: preview.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, setPage: changePreviewPage, setZoom: changePreviewZoom });
+    onPreviewChange({ page: previewData.pages[activePreviewPage], pages: previewData.pages, width: previewData.width, height: previewData.height, row, totalRows: data.rows.length, pageIndex: activePreviewPage, zoom: previewZoom, setPage: changePreviewPage, setZoom: changePreviewZoom });
     return () => onPreviewChange(null);
-  }, [onPreviewChange, preview, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewZoom]);
+  }, [onPreviewChange, previewData, data, row, activePreviewPage, previewZoom, changePreviewPage, changePreviewZoom]);
 
   function setRows(next: CsvData) {
     if (next.rows.length > MAX_CSV_ROWS) throw new Error(`Google Sheets supports up to ${MAX_CSV_ROWS} data rows per batch.`);
