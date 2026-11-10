@@ -6,6 +6,20 @@ const FIELD = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const IMAGE_FIELD = /^\{\{\s*([^{}]+?)\s*\}\}$/;
 export type CsvData = { headers: string[]; rows: string[][] };
 
+function addImageFrame(obj: SerializedObject): void {
+  if (obj.clipPath || typeof obj.width !== "number" || typeof obj.height !== "number") return;
+  obj.clipPath = {
+    type: "Rect",
+    left: 0,
+    top: 0,
+    width: obj.width,
+    height: obj.height,
+    originX: "center",
+    originY: "center",
+    fill: "#ffffff",
+  };
+}
+
 /** RFC 4180 fields, including escaped quotes, embedded newlines and UTF-8 BOM. */
 export function parseCsv(source: string): CsvData {
   if (new TextEncoder().encode(source).length > MAX_CSV_BYTES) throw new Error("CSV must be 2 MB or smaller");
@@ -87,6 +101,7 @@ export function fillTemplate(doc: DesignDoc, data: CsvData, rowIndex: number, ma
           if (!value) throw new Error(`Image field "${field}" is empty`);
           next.src = value;
           next.gimageImageField = field;
+          addImageFrame(next);
         }
       }
       if (Array.isArray(obj.objects)) next.objects = visit(obj.objects as SerializedObject[]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { ActiveSelection, Canvas, FabricImage, FabricObject, Group, IText, Point, filters, type TPointerEventInfo } from "fabric";
+import { ActiveSelection, Canvas, FabricImage, FabricObject, Group, IText, Point, Rect, filters, type TPointerEventInfo } from "fabric";
 import { loadFonts } from "@/lib/design/fonts";
 import { DEFAULT_DYNAMIC_IMAGE_SRC, MAX_OBJECTS_PER_PAGE, newPageId, type DesignDoc, type PageBackground, type PageData, type SerializedObject } from "@/lib/design/types";
 import { scaleObjects } from "@/lib/design/scale";
@@ -949,6 +949,17 @@ export class EditorEngine {
     const field = value.trim().replace(/^\{\{\s*|\s*\}\}$/g, "");
     if (field && !/^[a-zA-Z0-9_.-]+$/.test(field)) return;
     active.set("gimageImageField", field || null);
+    if (field && !active.clipPath) {
+      active.set("clipPath", new Rect({
+        left: 0,
+        top: 0,
+        width: active.width,
+        height: active.height,
+        originX: "center",
+        originY: "center",
+        fill: "#ffffff",
+      }));
+    }
     this.canvas.requestRenderAll();
     this.commit();
   }
