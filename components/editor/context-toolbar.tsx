@@ -273,7 +273,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
             </Popover>
           )}
           <Divider />
-          <Popover label="Effects" trigger={({ toggle, open }) => (
+          <Popover label="Effects" portal trigger={({ toggle, open }) => (
             <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">
               Effects
             </button>
