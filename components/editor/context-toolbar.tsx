@@ -63,7 +63,7 @@ function Slider({ label, value, min, max, step, onChange, format }: { label: str
 const ALIGN_ICONS = { left: AlignLeft, center: AlignCenter, right: AlignRight, justify: AlignJustify } as const;
 const ALIGN_ORDER = ["left", "center", "right", "justify"] as const;
 
-export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => void }) {
+export function ContextToolbar({ onOpenBackground, onOpenColor }: { onOpenBackground: () => void; onOpenColor: () => void }) {
   const { engine, state } = useEditor();
   const sel = state.selection;
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -158,9 +158,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
             </>
           )}
           {!sel.isImage && !sel.isLine && (
-            <Popover label={text ? "Text color" : "Fill color"} portal trigger={({ toggle, open }) => <ColorSwatchButton color={sel.fill} onClick={toggle} open={open} label={text ? "Text color" : "Fill color"} />}>
-              <ColorPicker value={sel.fill} onChange={(c) => engine.updateSelection({ fill: c })} allowNone={!text} />
-            </Popover>
+            <ColorSwatchButton color={sel.fill} onClick={onOpenColor} label={text ? "Text color" : "Fill color"} />
           )}
           {sel.isImage && <Popover label="Edit photo" portal trigger={({ toggle, open }) => (
             <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">Edit photo</button>

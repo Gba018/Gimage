@@ -41,6 +41,7 @@ import { EditorEngine, type EngineState } from "./engine";
 import { renderThumbnail } from "./fabric-setup";
 import { AiPanel, BackgroundPanel, BrandKitPanel, DRAG_MIME, ElementsPanel, HistoryPanel, LayersPanel, TemplatesPanel, TextPanel, UploadsPanel, type DragPayload } from "./panels";
 import { PageStrip } from "./page-strip";
+import { ColorPanel } from "./color-panel";
 import { useShortcuts } from "./use-shortcuts";
 import { uploadImage } from "./uploads";
 import { text as textBuilder } from "@/lib/design/builders";
@@ -102,6 +103,7 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [sharedZoom, setSharedZoom] = useState(1);
   const [editorFitScale, setEditorFitScale] = useState(1);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [colorPanelOpen, setColorPanelOpen] = useState(false);
 
   const handleBulkPreviewChange = useCallback((preview: BulkPreviewState | null) => {
     const wasEmpty = bulkPreview === null;
@@ -608,7 +610,7 @@ export function Editor({ design }: { design: EditorDesign }) {
           <div className="shrink-0 border-b border-ink-200 bg-white">
             {ctx ? (
               <EditorContext value={ctx}>
-                <ContextToolbar onOpenBackground={() => setPanel("background")} />
+                <ContextToolbar onOpenBackground={() => setPanel("background")} onOpenColor={() => setColorPanelOpen(true)} />
               </EditorContext>
             ) : (
               <div className="h-12" />
@@ -682,6 +684,11 @@ export function Editor({ design }: { design: EditorDesign }) {
             </EditorContext>
           )}
         </main>
+        {colorPanelOpen && ctx && (
+          <EditorContext value={ctx}>
+            <ColorPanel onClose={() => setColorPanelOpen(false)} />
+          </EditorContext>
+        )}
       </div>
 
       {ctx && (
