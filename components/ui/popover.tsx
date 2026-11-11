@@ -46,7 +46,7 @@ export function Popover({
     if (!open || !portal) return;
     const update = () => {
       const bounds = ref.current?.getBoundingClientRect();
-      if (bounds) setPosition({ top: bounds.bottom + 8, left: bounds.left });
+      if (bounds) setPosition({ top: bounds.bottom + 8, left: align === "right" ? bounds.right : align === "center" ? bounds.left + bounds.width / 2 : bounds.left });
     };
     update();
     window.addEventListener("resize", update);
@@ -61,7 +61,7 @@ export function Popover({
     <div ref={ref} className="relative">
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
       {open && (portal ? (position && createPortal(
-        <div ref={contentRef} role="dialog" aria-label={label} className={`fixed z-[100] rounded-xl bg-white p-3 shadow-pop ring-1 ring-ink-100 ${className}`} style={{ top: position.top, left: position.left }}>
+        <div ref={contentRef} role="dialog" aria-label={label} className={`fixed z-[100] rounded-xl bg-white p-3 shadow-pop ring-1 ring-ink-100 ${className}`} style={{ top: position.top, left: position.left, transform: align === "right" ? "translateX(-100%)" : align === "center" ? "translateX(-50%)" : undefined }}>
           {typeof children === "function" ? children(() => setOpen(false)) : children}
         </div>,
         document.body,

@@ -158,11 +158,11 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
             </>
           )}
           {!sel.isImage && !sel.isLine && (
-            <Popover label={text ? "Text color" : "Fill color"} trigger={({ toggle, open }) => <ColorSwatchButton color={sel.fill} onClick={toggle} open={open} label={text ? "Text color" : "Fill color"} />}>
+            <Popover label={text ? "Text color" : "Fill color"} portal trigger={({ toggle, open }) => <ColorSwatchButton color={sel.fill} onClick={toggle} open={open} label={text ? "Text color" : "Fill color"} />}>
               <ColorPicker value={sel.fill} onChange={(c) => engine.updateSelection({ fill: c })} allowNone={!text} />
             </Popover>
           )}
-          {sel.isImage && <Popover label="Edit photo" trigger={({ toggle, open }) => (
+          {sel.isImage && <Popover label="Edit photo" portal trigger={({ toggle, open }) => (
             <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">Edit photo</button>
           )}>
             <div className="w-56 space-y-3 text-sm text-ink-700">
@@ -219,7 +219,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
               <IconButton label={`Text align: ${text.textAlign} (click for ${nextAlign})`} onClick={() => engine.updateText({ textAlign: nextAlign })}>
                 <AlignIcon size={16} />
               </IconButton>
-              <Popover label="Spacing" trigger={({ toggle, open }) => (
+              <Popover label="Spacing" portal trigger={({ toggle, open }) => (
                 <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">
                   Spacing
                 </button>
@@ -229,7 +229,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
                   <Slider label="Line height" value={text.lineHeight} min={0.6} max={3} step={0.05} onChange={(v) => engine.updateText({ lineHeight: v })} format={(v) => v.toFixed(2)} />
                 </div>
               </Popover>
-              <Popover label="Text layout" trigger={({ toggle, open }) => (
+              <Popover label="Text layout" portal trigger={({ toggle, open }) => (
                 <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">Text layout</button>
               )}>
                 <div className="w-64 space-y-3 text-sm text-ink-700">
@@ -252,7 +252,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
             </>
           )}
           {!text && !sel.isMulti && (
-            <Popover label="Border" trigger={({ toggle, open }) => (
+            <Popover label="Border" portal trigger={({ toggle, open }) => (
               <button type="button" onClick={toggle} aria-expanded={open} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">
                 <span className="h-4 w-4 rounded-sm border-2" style={{ borderColor: sel.stroke ?? "#c4c2d1" }} /> {sel.isLine ? "Line" : "Border"}
               </button>
@@ -264,7 +264,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
             </Popover>
           )}
           {sel.radius !== null && (
-            <Popover label="Corner radius" trigger={({ toggle, open }) => (
+            <Popover label="Corner radius" portal trigger={({ toggle, open }) => (
               <button type="button" onClick={toggle} aria-expanded={open} className="h-8 shrink-0 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">
                 Corners
               </button>
@@ -292,7 +292,7 @@ export function ContextToolbar({ onOpenBackground }: { onOpenBackground: () => v
           <IconButton label="Flip vertical" onClick={() => engine.flip("y")}>
             <FlipVertical2 size={16} />
           </IconButton>
-          <Popover label="Position" align="right" trigger={({ toggle, open }) => (
+          <Popover label="Position" align="right" portal trigger={({ toggle, open }) => (
             <button type="button" onClick={toggle} aria-expanded={open} className="flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-sm text-ink-700 hover:bg-ink-100">
               <Layers2 size={15} /> Position
             </button>
