@@ -101,6 +101,7 @@ export function Editor({ design }: { design: EditorDesign }) {
   const [ribbonVisible, setRibbonVisible] = useState(true);
   const [sharedZoom, setSharedZoom] = useState(1);
   const [editorFitScale, setEditorFitScale] = useState(1);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleBulkPreviewChange = useCallback((preview: BulkPreviewState | null) => {
     const wasEmpty = bulkPreview === null;
@@ -301,6 +302,18 @@ export function Editor({ design }: { design: EditorDesign }) {
     if (bulkPreviewVisible && bulkPreview) void engine.showPreview(bulkPreview.page);
     else void engine.hidePreview();
   }, [engine, bulkPreviewVisible, bulkPreview?.page]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    document.addEventListener("pointerdown", close, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", close, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [contextMenu]);
 
   // Refit when the design is resized.
   const lastSize = useRef(`${design.doc.width}x${design.doc.height}`);
@@ -614,6 +627,11 @@ export function Editor({ design }: { design: EditorDesign }) {
               if (e.currentTarget === e.target) setDropActive(false);
             }}
             onDrop={onDrop}
+            onContextMenu={(event) => {
+              if (bulkPreviewVisible) return;
+              event.preventDefault();
+              setContextMenu({ x: event.clientX, y: event.clientY });
+            }}
             onPointerDown={(e) => {
               // Clicking the grey area around the page clears the selection.
               if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.workspace) engine?.deselect();
@@ -674,6 +692,29 @@ export function Editor({ design }: { design: EditorDesign }) {
         </EditorContext>
       )}
       <ShortcutsDialog open={dialog === "shortcuts"} onClose={() => setDialog(null)} />
+
+      {contextMenu && engine && !bulkPreviewVisible && (
+        <div
+          role="menu"
+          aria-label="Canvas actions"
+          className="fixed z-[120] min-w-52 rounded-xl bg-white p-1.5 text-sm text-ink-800 shadow-pop ring-1 ring-ink-100"
+          style={{ left: Math.min(contextMenu.x, window.innerWidth - 220), top: Math.min(contextMenu.y, window.innerHeight - 360) }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <button type="button" role="menuitem" className="context-menu-item" onClick={() => { engine.selectAll(); setContextMenu(null); }}>Select all <span>Ctrl+A</span></button>
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection} onClick={() => { engine.copy(); setContextMenu(null); }}>Copy <span>Ctrl+C</span></button>
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!engine.hasClipboard()} onClick={() => { void engine.paste(); setContextMenu(null); }}>Paste <span>Ctrl+V</span></button>
+          <div className="my-1 border-t border-ink-100" />
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection} onClick={() => { void engine.duplicate(); setContextMenu(null); }}>Duplicate <span>Ctrl+D</span></button>
+          {state.selection?.isMulti && <button type="button" role="menuitem" className="context-menu-item" onClick={() => { engine.group(); setContextMenu(null); }}>Group <span>Ctrl+G</span></button>}
+          {state.selection?.isGroup && <button type="button" role="menuitem" className="context-menu-item" onClick={() => { engine.ungroup(); setContextMenu(null); }}>Ungroup <span>Ctrl+Shift+G</span></button>}
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection || state.selection.locked} onClick={() => { engine.deleteSelection(); setContextMenu(null); }}>Delete <span>Del</span></button>
+          <div className="my-1 border-t border-ink-100" />
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection} onClick={() => { engine.reorder("front"); setContextMenu(null); }}>Bring to front</button>
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection} onClick={() => { engine.reorder("back"); setContextMenu(null); }}>Send to back</button>
+          <button type="button" role="menuitem" className="context-menu-item" disabled={!state.selection} onClick={() => { engine.toggleLock(); setContextMenu(null); }}>{state.selection?.locked ? "Unlock" : "Lock"}</button>
+        </div>
+      )}
 
       <div className="pointer-events-none fixed bottom-28 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2" aria-live="polite">
         {toasts.map((t) => (

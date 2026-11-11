@@ -195,6 +195,21 @@ body {
   background-color: #e8e6ef;
 }
 
+.context-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.context-menu-item:hover { background: #f1f0f5; }
+.context-menu-item:disabled { cursor: not-allowed; color: #aaa7b5; }
+.context-menu-item span { color: #8b8796; font-size: 0.7rem; }
+
 dialog::backdrop {
   background: rgb(15 13 26 / 0.45);
 }
