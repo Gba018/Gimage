@@ -29,11 +29,11 @@ export function PageStrip({ onFit, onManualZoom, bulkPreview, onHideRibbon, zoom
             </Button>
           </li>}
           {bulkPreview.rowPreviews.map(({ index, page }) => (
-            <li key={index} className="shrink-0">
+            <li key={index} className="group relative shrink-0">
               <button type="button" onClick={() => bulkPreview.setRow(index)} aria-current={index === bulkPreview.row ? "page" : undefined} aria-label={`Row ${index + 1}`} className={`block h-14 overflow-hidden rounded-md ring-2 ${index === bulkPreview.row ? "ring-brand-600" : "ring-transparent hover:ring-ink-300"}`}>
                 <DesignPreview page={page} width={bulkPreview.width} height={bulkPreview.height} alt={`Row ${index + 1}`} fit="contain" maxSize={240} className="h-14" />
               </button>
-              <span className="block text-center text-[10px] text-ink-600">{index + 1}</span>
+              <span className="absolute -top-1 left-1 rounded bg-white/90 px-1 text-[10px] font-medium text-ink-700 shadow-sm">{index + 1}</span>
             </li>
           ))}
         </ol>
